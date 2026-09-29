@@ -1,0 +1,25 @@
+# Environment
+.env
+.venv/
+env/
+venv/
+ENV/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.mypy_cache/
+
+# Data artifacts
+data/faiss_index/
+data/*.faiss
+data/*.pkl
+
+# IDE / OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
