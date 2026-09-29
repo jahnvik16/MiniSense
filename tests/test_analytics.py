@@ -203,6 +203,11 @@ def test_get_top_themes(sample_records: list[dict]) -> None:
     assert worst[0].theme == "Pricing"  # CSAT 0.0%
     assert worst[0].csat == 0.0
 
+    # Negative volume sorting
+    neg = get_top_themes(sample_records, top_n=3, metric="negative_volume")
+    assert neg[0].theme == "Wait Time"  # 2 negative responses
+    assert neg[0].sentiment_breakdown.get("negative") == 2
+
 
 # 7. Period comparison tests
 def test_compare_period_metrics(sample_records: list[dict]) -> None:

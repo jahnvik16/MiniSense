@@ -189,7 +189,8 @@ class OrchestratorAgent:
                     start_date=data_start,
                     end_date=data_end,
                     parameters={
-                        "metric_name": "csat",
+                        "metric_name": "negative_volume" if is_complaint_query else "csat",
+                        "theme_metric": "negative_volume" if is_complaint_query else None,
                         "cohort": cohort,
                         "category": theme,
                         "theme": theme,

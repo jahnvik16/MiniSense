@@ -17,7 +17,7 @@ def test_rag_agent_refund_policy_retrieval(rag_agent: RAGAgent) -> None:
         task_id="task_refund_query",
         agent=AgentType.RAG_AGENT.value,
         task_type=TaskType.RAG_LOOKUP.value,
-        question="What is our policy on refunds when customers downgrade?",
+        question="How do you handle customer complaints and refunds for quality issues?",
         parameters={"top_k": 2},
     )
     result = rag_agent.run(task)
@@ -28,9 +28,9 @@ def test_rag_agent_refund_policy_retrieval(rag_agent: RAGAgent) -> None:
     assert len(result.scores) == len(result.retrieved_chunks)
     assert len(result.source_metadata) == len(result.retrieved_chunks)
 
-    # Top chunk should be faq_chunk_1 (refund policy)
+    # Top chunk should be faq_chunk_3 (complaints & refunds policy)
     top_meta = result.source_metadata[0]
-    assert top_meta["chunk_id"] == "faq_chunk_1"
+    assert top_meta["chunk_id"] == "faq_chunk_3"
     assert "refund" in result.retrieved_chunks[0].lower()
     assert top_meta["score"] >= 0.35
 
@@ -40,15 +40,15 @@ def test_rag_agent_wait_time_policy_retrieval(rag_agent: RAGAgent) -> None:
         task_id="task_wait_time_query",
         agent=AgentType.RAG_AGENT.value,
         task_type=TaskType.RAG_LOOKUP.value,
-        question="What are the wait time rules and express pickup standards?",
+        question="What is the average wait time during off-peak and peak hours?",
         parameters={"top_k": 1},
     )
     result = rag_agent.run(task)
 
     assert result.reliable is True
     assert len(result.retrieved_chunks) == 1
-    assert result.source_metadata[0]["chunk_id"] == "faq_chunk_3"
-    assert "express mobile pickup" in result.retrieved_chunks[0].lower()
+    assert result.source_metadata[0]["chunk_id"] == "faq_chunk_2"
+    assert "wait time" in result.retrieved_chunks[0].lower()
 
 
 def test_rag_agent_low_confidence_handling(rag_agent: RAGAgent) -> None:

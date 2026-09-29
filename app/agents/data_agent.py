@@ -52,6 +52,7 @@ class DataAgent:
             start_date = None
             end_date = None
             top_n = 5
+            params = {}
 
         tools_invoked: list[str] = []
         warnings: list[str] = []
@@ -74,13 +75,19 @@ class DataAgent:
                 warnings.append(f"Date filtering encountered an issue ({e}); proceeded with unfiltered dates")
 
         # 4. Determine theme sorting criterion from question semantics
-        question_lower = question.lower()
-        if any(term in question_lower for term in ("complaint", "worst", "unhappy", "dissatisfied", "negative", "issues")):
-            theme_metric = "worst_csat"
-        elif any(term in question_lower for term in ("best", "highest", "top satisfaction")):
-            theme_metric = "best_csat"
+        param_metric = params.get("metric") or params.get("theme_metric")
+        if param_metric:
+            theme_metric = param_metric
         else:
-            theme_metric = "volume"
+            question_lower = question.lower()
+            if any(term in question_lower for term in ("worst", "lowest csat", "worst performing", "lowest rating", "poor")):
+                theme_metric = "worst_csat"
+            elif any(term in question_lower for term in ("complaint", "complaints", "negative", "issues", "dissatisfied", "unhappy")):
+                theme_metric = "negative_volume"
+            elif any(term in question_lower for term in ("best", "highest", "top satisfaction")):
+                theme_metric = "best_csat"
+            else:
+                theme_metric = "volume"
 
         # 5. Call explicit deterministic analytics tools
         resp_count = self.tools["count_responses"](records)

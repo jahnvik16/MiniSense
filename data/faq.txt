@@ -1,25 +1,22 @@
-# MiniSense Operations & Policy Knowledge Base
+# GreenLeaf Bistro — Customer Experience FAQ
 
-## Q1: What is the refund and cancellation policy for subscription plans?
-All self-serve subscriptions (Free, Starter, and Standard tiers) are billed in advance on monthly or annual cycles. We do not provide prorated refunds or mid-cycle partial credits when an account downgrades or cancels early; platform access and current plan privileges remain fully operational until the end of the paid billing period. Enterprise agreements with annual commitments may request tailored commercial terms and termination credit clauses subject to Master Services Agreement (MSA) review.
+## Q1: What are your most popular menu items?
+Our top sellers are the Avocado Toast, Garden Bowl, and Cold Brew Coffee. All menu items emphasize fresh, locally sourced organic produce, whole grains, and artisanal dressings prepared from scratch every morning. Seasonal specials rotate quarterly based on regional harvest availability. For guests with specialized dietary requirements, gluten-free toast substitutions, dairy-free milk alternatives (oat and almond), and plant-based protein add-ons such as marinated tofu and roasted chickpeas are readily available across all order channels.
 
-## Q2: How are pricing tiers, seat allowances, and export quotas structured?
-Our Free plan allows up to 100 survey response exports per month in CSV format with 1 administrative user seat. The Starter plan provides up to 5 team seats, unlimited CSV and Excel spreadsheet exports, and weekly automated summary reports. The Enterprise plan removes all data limits, enabling unlimited CSV, JSON, and PDF report downloads, multi-team permission roles, dedicated Snowflake and BigQuery data warehouse connectors, and production REST API access.
+## Q2: What is your average wait time?
+We target under 10 minutes for counter orders during off-peak hours. Peak hours (12:00 PM–1:00 PM lunch and 6:00 PM–8:00 PM dinner) may see 15–20 minute waits due to high kitchen order volume. Beginning May 1st, dedicated express pickup stations were introduced across all bistro locations to separate advance mobile orders from walk-in registers. Guests ordering through our mobile app receive real-time kitchen tracking notifications with estimated preparation windows to help minimize in-store waiting.
 
-## Q3: What operational standards and express pickup guidelines govern wait times?
-Kitchen and front-counter operations target a maximum wait time of 5 to 7 minutes for non-peak orders and under 12 minutes during peak rush periods. Beginning May 1st, express mobile pickup lanes were introduced at all flagship locations to expedite digital orders. If wait times exceed 20 minutes due to unexpected operational bottlenecks, store supervisors are authorized to issue immediate complimentary beverage vouchers or loyalty credits.
+## Q3: How do you handle complaints?
+All complaints are escalated to the shift manager within 15 minutes. Refunds or replacements are offered for quality issues. If an order takes longer than 20 minutes due to unexpected kitchen bottlenecks, supervisors are empowered to issue immediate complimentary beverage vouchers or GreenLeaf loyalty points. We conduct daily shift debriefs to review all guest feedback submitted via digital receipts or counter cards, ensuring operational issues are resolved swiftly.
 
-## Q4: What features, offline capabilities, and OS requirements are supported in App v2.0?
-The redesigned MiniSense Mobile App (v2.0, released late April) features one-tap digital payments, real-time push tracking from kitchen to counter, contactless table ordering, and localized loyalty rewards. It includes offline caching for order receipts and supports iOS 15+ and Android 11+. Legacy versions below v2.0 experienced Bluetooth check-in and checkout stability issues and should be updated immediately via the App Store or Google Play.
+## Q4: What is your CSAT target?
+We aim for an CSAT of 4.5+. Scores below 4.0 trigger a root-cause review with the operations team. Store general managers evaluate weekly customer satisfaction metrics across individual categories—including food temperature, cleanliness, order accuracy, and cashier friendliness. Corrective action plans, which may involve additional station prep training or adjusted shift staffing allocations during rush hours, must be submitted within 48 hours of any score dip.
 
-## Q5: How do customer loyalty tiers, points accumulation, and reward expirations work?
-Customers earn 10 reward points per dollar spent across all channels. Members reach VIP status upon accumulating 2,500 points within a calendar year, unlocking free priority shipping, monthly exclusive tasting events, and dedicated phone support. Reward points remain valid for 12 months of account activity; an automated email alert is sent 30 days prior to any pending point expiration. Points cannot be redeemed for cash or transferred between accounts.
+## Q5: How do group orders, catering, and table reservations work?
+We operate primarily as a fast-casual dining experience with open seating on a first-come, first-served basis, though patio reservations are available for evening dining parties of six or more. Large group catering orders must be placed at least 24 hours in advance via our online catering desk. Catering packages feature individually boxed lunches, sustainable compostable cutlery, and guaranteed delivery within a scheduled 15-minute delivery window.
 
-## Q6: What support response SLAs are guaranteed by account tier?
-Community forum access and automated knowledge documentation are available to all users 24/7. Starter tier subscribers receive ticketing and email support with a guaranteed response within 24 business hours. Enterprise clients are assigned a named Technical Account Manager (TAM) and benefit from a 1-hour critical incident response SLA with round-the-clock 24/7 phone and Slack escalation channels.
+## Q6: What cleanliness, hygiene, and kitchen sanitation protocols are enforced?
+Every GreenLeaf Bistro location follows comprehensive food safety standards. Kitchen prep stations, cutting surfaces, and cashier touchpoints are sanitized every 30 minutes, with team members adhering to mandatory hourly handwashing timers. Refrigeration units and cold-prep lines maintain strict digital temperature logs between 34°F and 38°F. Dining room tables, beverage condiment stands, and restrooms undergo documented physical inspections every hour during business operations.
 
-## Q7: What cleanliness, hygiene, and food preparation protocols are enforced?
-Every retail and dining location follows strict sanitation guidelines, including mandatory hand-washing cycles every 30 minutes, hourly sanitization of high-touch surfaces, and continuous digital temperature logging for all refrigeration units. High-traffic facility areas such as dining lounges and restrooms undergo documented physical inspections every two hours during service hours.
-
-## Q8: What accessibility features and facility amenities are provided at store locations?
-All retail locations comply fully with ADA accessibility standards, providing wheelchair-accessible entrances, lowered transaction counters, and dedicated accessible parking bays. High-speed guest Wi-Fi is provided complimentary for all visitors, alongside quiet workspace seating zones equipped with USB-C and standard charging outlets.
+## Q7: How does the GreenLeaf Rewards loyalty program work?
+Guests earn 10 GreenLeaf points per dollar spent on counter purchases, kiosk orders, and mobile pickups. Accumulating 500 points unlocks a free artisanal beverage, soup, or side salad, while 1,000 points unlocks any signature entree bowl or toast. Reward points remain active for 12 months from the date of issuance. Members receive double-point promotions on seasonal menu launches, complimentary birthday treats, and contactless mobile pay directly within the app.

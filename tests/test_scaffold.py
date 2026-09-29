@@ -87,9 +87,9 @@ def test_agents_scaffold_execution() -> None:
 
     # 3. RAGAgent
     rag_agent = RAGAgent()
-    rag_out = rag_agent.run(RAGAgentInput(query="support SLA", top_k=1))
+    rag_out = rag_agent.run(RAGAgentInput(query="average wait time", top_k=1))
     assert len(rag_out.retrieved_chunks) == 1
-    assert "SLA" in rag_out.grounding_context
+    assert "wait time" in rag_out.grounding_context.lower()
 
     # 4. ComparisonAgent
     comp_agent = ComparisonAgent(data_agent=data_agent)

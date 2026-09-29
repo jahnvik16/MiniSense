@@ -52,6 +52,30 @@ def test_data_agent_top_complaint_themes(data_agent: DataAgent) -> None:
     assert result.top_themes[1].csat <= result.top_themes[2].csat
 
 
+def test_data_agent_top_complaint_themes_negative_volume(data_agent: DataAgent) -> None:
+    task = TaskSpec(
+        task_id="task_complaints_neg",
+        agent=AgentType.DATA_AGENT.value,
+        task_type=TaskType.TOP_THEMES.value,
+        question="What are the top 3 customer complaint themes in May?",
+        start_date="2026-05-01",
+        end_date="2026-05-31",
+        parameters={"top_n": 3},
+    )
+    result = data_agent.run(task)
+
+    assert isinstance(result, DataAgentResult)
+    assert len(result.top_themes) == 3
+    assert result.supporting_metadata["theme_ranking_strategy"] == "negative_volume"
+    neg_0 = result.top_themes[0].sentiment_breakdown.get("negative", 0)
+    neg_1 = result.top_themes[1].sentiment_breakdown.get("negative", 0)
+    neg_2 = result.top_themes[2].sentiment_breakdown.get("negative", 0)
+    assert neg_0 >= neg_1 >= neg_2
+    assert result.top_themes[0].theme == "Pricing"
+    assert result.top_themes[1].theme == "Wait Time"
+    assert result.top_themes[2].theme == "Membership"
+
+
 def test_data_agent_date_range_filtering(data_agent: DataAgent) -> None:
     # April 2026
     task_apr = TaskSpec(

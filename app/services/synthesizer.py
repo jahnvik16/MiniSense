@@ -172,15 +172,20 @@ class Synthesizer:
             avg_delta = changes.get("average_rating_delta", 0.0)
             count_delta = int(changes.get("count_delta", 0))
 
+            # Check if comparison was scoped to a specific theme
+            import re
+            scope_match = re.search(r"for '([^']+)'", comparison_result.summary)
+            scope_phrase = f" for '{scope_match.group(1)}'" if scope_match else ""
+
             delta_direction = "improved by" if csat_delta > 0 else ("declined by" if csat_delta < 0 else "remained flat at")
             parts.append(
-                f"Comparing {curr.period_label} with {prev.period_label}, customer satisfaction {delta_direction} "
+                f"Comparing {curr.period_label} with {prev.period_label}{scope_phrase}, customer satisfaction {delta_direction} "
                 f"{abs(csat_delta):.1f} percentage points ({prev.csat:.1f}% vs. {curr.csat:.1f}% CSAT). "
                 f"Average rating shifted {avg_delta:+.2f} ({prev.average_rating:.2f} -> {curr.average_rating:.2f}) "
                 f"across {curr.response_count:,} evaluated responses (volume change: {count_delta:+,d})."
             )
 
-            if curr.top_themes:
+            if curr.top_themes and not scope_phrase:
                 theme_str = ", ".join(f"{t.theme} ({t.count:,} responses, {t.csat:.1f}% CSAT)" for t in curr.top_themes[:3])
                 parts.append(f"Top feedback themes for {curr.period_label} are {theme_str}.")
 
@@ -191,10 +196,18 @@ class Synthesizer:
                 f"{data_result.average_rating:.2f} and an overall CSAT of {data_result.csat:.1f}%."
             )
             if data_result.top_themes:
-                theme_str = ", ".join(
-                    f"{t.theme} ({t.count:,} responses, CSAT: {t.csat:.1f}%)" for t in data_result.top_themes[:3]
-                )
-                parts.append(f"Primary feedback driver themes are {theme_str}.")
+                theme_ranking_strategy = data_result.supporting_metadata.get("theme_ranking_strategy", "volume")
+                if theme_ranking_strategy == "negative_volume":
+                    theme_str = ", ".join(
+                        f"{t.theme} ({t.sentiment_breakdown.get('negative', 0):,} complaints, CSAT: {t.csat:.1f}%)"
+                        for t in data_result.top_themes[:3]
+                    )
+                    parts.append(f"Top customer complaint themes are {theme_str}.")
+                else:
+                    theme_str = ", ".join(
+                        f"{t.theme} ({t.count:,} responses, CSAT: {t.csat:.1f}%)" for t in data_result.top_themes[:3]
+                    )
+                    parts.append(f"Primary feedback driver themes are {theme_str}.")
 
         # Part C: Grounded FAQ / Policy context
         if rag_result and rag_result.reliable and rag_result.retrieved_chunks:
