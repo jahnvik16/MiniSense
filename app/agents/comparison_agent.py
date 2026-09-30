@@ -10,6 +10,7 @@ from app.models.schemas import (
 )
 from app.services.survey_service import SurveyService
 from app.tools.data_tools import (
+    classify_record_theme,
     classify_theme,
     compare_period_metrics,
     compute_average_rating,
@@ -19,6 +20,7 @@ from app.tools.data_tools import (
     filter_by_date,
     filter_surveys,
     get_top_themes,
+    normalize_theme_name,
 )
 
 
@@ -48,8 +50,11 @@ class ComparisonAgent:
 
         if isinstance(task_or_input, TaskSpec):
             params = task_or_input.parameters
-            theme = params.get("theme") or params.get("category")
-            cohort = params.get("cohort")
+            filters = task_or_input.filters or {}
+            theme = params.get("theme") or params.get("category") or filters.get("theme") or filters.get("category")
+            cohort = params.get("cohort") or params.get("response_channel") or params.get("channel") or filters.get("cohort") or filters.get("response_channel")
+            response_channel = params.get("response_channel") or filters.get("response_channel") or cohort
+            business_id = params.get("business_id") or filters.get("business_id")
             top_n = int(params.get("top_n", 5))
 
             # Current period bounds
@@ -91,6 +96,8 @@ class ComparisonAgent:
                 previous_end=previous_end,
                 theme=theme,
                 cohort=cohort,
+                response_channel=response_channel,
+                business_id=business_id,
                 current_label=current_label,
                 previous_label=previous_label,
                 top_n=top_n,
@@ -114,31 +121,40 @@ class ComparisonAgent:
         previous_end: str | None,
         theme: str | None = None,
         cohort: str | None = None,
+        response_channel: str | None = None,
+        business_id: str | None = None,
         current_label: str = "Current Period",
         previous_label: str = "Previous Period",
         top_n: int = 5,
     ) -> ComparisonAgentResult:
         """Compare performance across two distinct time windows."""
         pool = records
-        if theme:
-            target_theme = theme.lower().strip()
+        norm_theme = normalize_theme_name(theme)
+        if norm_theme:
+            target_lower = norm_theme.lower()
             pool = [
                 r for r in pool
                 if (
-                    (r.get("theme") and r["theme"].lower() == target_theme)
-                    or (r.get("category") and r["category"].lower() == target_theme)
-                    or classify_theme(r.get("free_text") or r.get("feedback") or "").lower() == target_theme
+                    (r.get("theme") and r["theme"].lower() == target_lower)
+                    or (r.get("category") and r["category"].lower() == target_lower)
+                    or classify_record_theme(r).lower() == target_lower
                 )
             ]
-        if cohort:
-            target_cohort = cohort.lower().strip()
+        target_channel = (response_channel or cohort or "").lower().strip()
+        if target_channel:
             pool = [
                 r for r in pool
                 if (
-                    r.get("cohort", "").lower() == target_cohort
-                    or r.get("response_channel", "").lower() == target_cohort
-                    or r.get("channel", "").lower() == target_cohort
+                    str(r.get("response_channel", "")).lower() == target_channel
+                    or str(r.get("channel", "")).lower() == target_channel
+                    or str(r.get("cohort", "")).lower() == target_channel
                 )
+            ]
+        if business_id:
+            target_biz = business_id.lower().strip()
+            pool = [
+                r for r in pool
+                if str(r.get("business_id", "")).lower() == target_biz
             ]
 
         # Filter records for both periods

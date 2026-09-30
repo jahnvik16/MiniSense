@@ -33,9 +33,13 @@ from app.tools.data_tools import (
     classify_sentiment,
     classify_theme,
     classify_record_theme,
+    compare_period_metrics,
     compute_csat,
     compute_average_rating,
     count_responses,
+    derive_sentiment,
+    filter_by_date,
+    filter_surveys,
     get_top_themes,
 )
 from app.agents.planner import (
@@ -344,3 +348,170 @@ def test_unsupported_question_handles_safely() -> None:
     assert isinstance(result, FinalAnswer)
     # System should produce a safe response or state that no survey data exists
     assert len(result.answer) > 20
+
+
+# ---------------------------------------------------------
+# 9. Mandatory Production Audit Tests (Appendix A Schema & Analytics)
+# ---------------------------------------------------------
+
+def test_audit_1_filter_by_date_uses_date_not_timestamp() -> None:
+    """Mandatory Test 1: filter_by_date() works using Appendix A 'date', not timestamp."""
+    records = [
+        {"response_id": "r1", "date": "2026-04-15", "rating": 5, "free_text": "Great"},
+        {"response_id": "r2", "date": "2026-05-10", "rating": 4, "free_text": "Good"},
+        {"response_id": "r3", "date": "2026-06-01", "rating": 3, "free_text": "Okay"},
+    ]
+    for r in records:
+        assert "timestamp" not in r
+
+    apr = filter_by_date(records, start_date="2026-04-01", end_date="2026-04-30")
+    assert len(apr) == 1
+    assert apr[0]["response_id"] == "r1"
+
+    may = filter_by_date(records, start_date="2026-05-01", end_date="2026-05-31")
+    assert len(may) == 1
+    assert may[0]["response_id"] == "r2"
+
+
+def test_audit_2_april_filtering_returns_nonzero_records() -> None:
+    """Mandatory Test 2: April filtering returns nonzero records on dataset."""
+    service = SurveyService()
+    records = service.get_all_surveys()
+    apr_records = filter_by_date(records, "2026-04-01", "2026-04-30")
+    assert len(apr_records) > 0
+    assert len(apr_records) > 10000
+
+
+def test_audit_3_may_filtering_returns_nonzero_records() -> None:
+    """Mandatory Test 3: May filtering returns nonzero records on dataset."""
+    service = SurveyService()
+    records = service.get_all_surveys()
+    may_records = filter_by_date(records, "2026-05-01", "2026-05-31")
+    assert len(may_records) > 0
+    assert len(may_records) > 10000
+
+
+def test_audit_4_classify_theme_representative_examples() -> None:
+    """Mandatory Test 4: classify_theme(free_text) correctly classifies representative examples."""
+    representative = {
+        "The artisan salad and burger were fresh and delicious": "Food Quality",
+        "Waited 30 minutes in line for my order": "Wait Time",
+        "The cashier and manager were extremely helpful and polite": "Staff",
+        "The restroom was dirty and tables were messy": "Cleanliness",
+        "Prices are too high and not worth the money": "Pricing",
+        "My monthly membership loyalty points did not apply": "Membership",
+        "The parking lot was full and outdoor patio seating was closed": "Facilities",
+        "The mobile app keeps crashing during checkout": "App Experience",
+    }
+    for text, expected in representative.items():
+        assert classify_theme(text) == expected, f"Failed for '{text}'"
+
+
+def test_audit_5_derive_sentiment_expected_classes() -> None:
+    """Mandatory Test 5: derive_sentiment(rating) returns 1-2 negative, 3 neutral, 4-5 positive."""
+    assert derive_sentiment(1) == "negative"
+    assert derive_sentiment(2) == "negative"
+    assert derive_sentiment(3) == "neutral"
+    assert derive_sentiment(4) == "positive"
+    assert derive_sentiment(5) == "positive"
+
+
+def test_audit_6_get_top_themes_no_general_collapse() -> None:
+    """Mandatory Test 6: get_top_themes() does not return 'General' for the generated dataset."""
+    service = SurveyService()
+    records = service.get_all_surveys()
+    top_themes = get_top_themes(records[:2000], top_n=5)
+    theme_names = [t.theme for t in top_themes]
+    assert len(theme_names) == 5
+    assert "General" not in theme_names
+    valid_taxonomy = {
+        "Food Quality", "Wait Time", "Staff", "Cleanliness",
+        "Pricing", "Membership", "Facilities", "App Experience"
+    }
+    for t in theme_names:
+        assert t in valid_taxonomy, f"Unexpected theme '{t}' outside taxonomy"
+
+
+def test_audit_7_complaint_ranking_derived_negative_and_themes() -> None:
+    """Mandatory Test 7: complaint ranking uses derived negative sentiment and derived themes."""
+    service = SurveyService()
+    records = service.get_all_surveys()
+    apr_records = filter_by_date(records, "2026-04-01", "2026-04-30")
+    top_complaints = get_top_themes(apr_records, top_n=3, metric="negative_volume")
+    assert len(top_complaints) == 3
+    for t in top_complaints:
+        assert t.sentiment_breakdown["negative"] > 0
+    assert top_complaints[0].sentiment_breakdown["negative"] >= top_complaints[1].sentiment_breakdown["negative"]
+
+
+def test_audit_8_compare_period_metrics_produces_nonzero_metrics() -> None:
+    """Mandatory Test 8: compare_period_metrics() produces nonzero April/May metrics."""
+    service = SurveyService()
+    records = service.get_all_surveys()
+    res = compare_period_metrics(
+        records=records,
+        period_a_start="2026-04-01",
+        period_a_end="2026-04-30",
+        period_b_start="2026-05-01",
+        period_b_end="2026-05-31",
+        label_a="April 2026",
+        label_b="May 2026",
+    )
+    assert res.period_a.response_count > 10000
+    assert res.period_b.response_count > 10000
+    assert res.period_a.csat > 0.0
+    assert res.period_b.csat > 0.0
+    assert res.period_a.average_rating > 0.0
+    assert res.period_b.average_rating > 0.0
+
+
+def test_audit_9_channel_filtering_using_response_channel() -> None:
+    """Mandatory Test 9: channel filtering works using response_channel."""
+    records = [
+        {"response_id": "r1", "date": "2026-05-01", "response_channel": "mobile", "rating": 5, "free_text": "Great app"},
+        {"response_id": "r2", "date": "2026-05-02", "response_channel": "kiosk", "rating": 4, "free_text": "Easy kiosk"},
+        {"response_id": "r3", "date": "2026-05-03", "response_channel": "web", "rating": 3, "free_text": "Average web"},
+    ]
+    mobile_records = filter_surveys(records, response_channel="mobile")
+    assert len(mobile_records) == 1
+    assert mobile_records[0]["response_id"] == "r1"
+
+    kiosk_records = filter_surveys(records, response_channel="kiosk")
+    assert len(kiosk_records) == 1
+    assert kiosk_records[0]["response_id"] == "r2"
+
+
+def test_audit_10_business_filtering_using_business_id() -> None:
+    """Mandatory Test 10: business filtering works using business_id."""
+    records = [
+        {"response_id": "r1", "date": "2026-05-01", "business_id": "b01", "business_name": "Downtown", "rating": 5, "free_text": "Nice"},
+        {"response_id": "r2", "date": "2026-05-02", "business_id": "b02", "business_name": "Westside", "rating": 4, "free_text": "Good"},
+    ]
+    b01_records = filter_surveys(records, business_id="b01")
+    assert len(b01_records) == 1
+    assert b01_records[0]["business_id"] == "b01"
+
+
+def test_audit_11_appendix_a_schema_exact_persisted_fields() -> None:
+    """Mandatory Test 11: Appendix-A schema contains exactly the required persisted fields."""
+    with open(settings.surveys_file, "r", encoding="utf-8") as f:
+        records = json.load(f)[:100]
+    expected_keys = {
+        "response_id", "date", "business_id", "business_name",
+        "survey_id", "survey_name", "rating", "response_channel", "free_text"
+    }
+    for r in records:
+        assert set(r.keys()) == expected_keys
+
+
+def test_audit_12_no_raw_record_contains_derived_labels() -> None:
+    """Mandatory Test 12: No raw record contains theme/sentiment/category/cohort/csat/nps labels."""
+    with open(settings.surveys_file, "r", encoding="utf-8") as f:
+        records = json.load(f)[:500]
+    prohibited_keys = {
+        "theme", "category", "sentiment", "timestamp",
+        "cohort", "product_tier", "csat_score", "nps_score"
+    }
+    for r in records:
+        assert not (set(r.keys()) & prohibited_keys)
+

@@ -59,13 +59,25 @@ The architecture strictly enforces separation of reasoning, selection, and arith
 | **ARITHMETIC execution** | **Pure Python Tools** | Executes deterministic mathematical formulas without LLM involvement. |
 | **DATA return** | **DataAgentResult** | Returns validated Pydantic model with `tools_called` logged in metadata. |
 
+Deterministic computation eliminates LLM arithmetic variability and makes results reproducible and testable.
+
+### Analytical Data Flow Architecture
+MiniSense strictly isolates raw persisted data from analytical representations:
+```
+Raw Appendix-A record (9 persisted fields)
+    ↓
+Runtime Feature Derivation (classify_theme(free_text), derive_sentiment(rating))
+    ↓
+Deterministic Analytics Tools (compute_csat, compute_average_rating, get_top_themes)
+```
+
 ### Deterministic Analytics Tools ([app/tools/data_tools.py](file:///c:/Users/jkrid/OneDrive/Desktop/MiniSense/app/tools/data_tools.py))
 - `compute_csat(records)`: $\text{CSAT} = (\text{Count}(\text{Rating} \ge 4) / \text{Total Valid}) \times 100$
 - `compute_average_rating(records)`: Exact arithmetic mean rounded to 2 decimal places.
 - `count_responses(records)`: Total valid survey responses.
 - `get_top_themes(records, top_n, metric)`: Theme aggregation supporting `negative_volume`, `worst_csat`, `best_csat`, and `volume`.
-- `filter_by_date(records, start_date, end_date)`: Inclusive ISO date filtering.
-- `filter_surveys(records, channel, theme, business_id)`: Multi-dimensional segment filtering.
+- `filter_by_date(records, start_date, end_date)`: Inclusive ISO date filtering based strictly on the Appendix A `date` field.
+- `filter_surveys(records, response_channel, theme, business_id)`: Multi-dimensional segment filtering using Appendix A fields.
 
 ---
 
@@ -89,11 +101,11 @@ The survey feedback dataset ([data/surveys.json](file:///c:/Users/jkrid/OneDrive
 
 ### Key Principles of the Dataset:
 1. **Zero Pre-Labelled Ground Truth**: The raw records contain **only** the 9 fields required by Appendix A. No pre-computed labels (`theme`, `sentiment`, `csat_score`, `nps_score`, `category`, `cohort`) are stored.
-2. **Dynamic Classification**:
-   - **Themes**: Deterministically classified from `free_text` via keyword/phrase taxonomy across 8 controlled themes: *Food Quality, Wait Time, Staff, Cleanliness, Pricing, Membership, Facilities, App Experience*.
-   - **Sentiment**: Deterministically derived from `rating` ($1\text{–}2 \rightarrow \text{negative}$, $3 \rightarrow \text{neutral}$, $4\text{–}5 \rightarrow \text{positive}$).
+2. **Dynamic Runtime Derivation**:
+   - **Themes**: Deterministically classified at runtime from `free_text` via keyword/phrase taxonomy across 8 controlled themes: *Food Quality, Wait Time, Staff, Cleanliness, Pricing, Membership, Facilities, App Experience*.
+   - **Sentiment**: Deterministically derived at runtime from `rating` ($1\text{–}2 \rightarrow \text{negative}$, $3 \rightarrow \text{neutral}$, $4\text{–}5 \rightarrow \text{positive}$).
 3. **Lexical Diversity**: Free-text feedback is synthesized via combinatoric template slots (openers, specific menu items, complaint/praise nuances, and closers) across channels and dates, avoiding repetitive synthetic strings.
-4. **Controlled Evaluation Signals**: The synthetic generator intentionally includes controlled temporal signals so that comparison and trend-analysis capabilities can be evaluated.
+4. **Controlled Evaluation Signals**: The synthetic generator intentionally includes controlled temporal signals so that comparison and trend-analysis capabilities can be evaluated. Temporal signals are intentionally controlled synthetic evaluation signals and do not establish causal relationships.
 5. **No Unsupported Causal Claims**: Operational policies in the FAQ (e.g. express pickup stations launched May 1) provide context for observed changes, but correlation is never misrepresented as causal proof.
 
 ---
@@ -119,7 +131,7 @@ MiniSense was empirically evaluated against the 3 required benchmark scenarios a
    - Top themes: Pricing (2,047 negative mentions), Membership (855), Facilities (793).
 2. **Scenario 2 (Longitudinal Comparison)**: *"How did wait-time experience change from April to May?"*
    - Routes to `ComparisonAgent`; computes April vs. May metrics for Wait Time.
-   - Result: CSAT improved from 16.03% to 64.47% (**+48.44 points**); average rating increased from 2.21 to 3.75 (**+1.54 stars**).
+   - Result: CSAT improved from 12.51% to 60.95% (**+48.44 points**); average rating increased from 2.13 to 3.74 (**+1.61 stars**).
 3. **Scenario 3 (Hybrid Analytics + RAG)**: *"How did wait-time experience change from April to May, and what does the FAQ say about expected wait times?"*
    - Tri-agent orchestration: `ComparisonAgent` computes deltas, `RAGAgent` retrieves `faq_chunk_2` (similarity score `0.441`).
    - Executive synthesis integrates metrics with operating standards (off-peak <10 min, peak 15–20 min) and notes May 1st express pickup stations as operational context without unsupported causal claims.
@@ -201,14 +213,14 @@ python -m scripts.run_benchmarks
 
 ## 11. Automated Test Suite
 
-MiniSense includes a comprehensive test suite of **59 automated tests**:
+MiniSense includes a comprehensive test suite of **71 automated tests**:
 
 ```bash
 python -m pytest tests/ -v
 ```
 
 ### Test Coverage Breakdown:
-- `tests/test_v2_evaluation.py` (13 tests): Exact Appendix A schema, 50k–100k dataset size, dynamic theme/sentiment extraction, relative date resolution ("this month", "last month", named months), LLM planner structured validation, deterministic fallback, DataAgent tool invocation tracking, ComparisonAgent deltas, RAG natural-language retrieval, Scenario 3 hybrid flow, and safe out-of-domain query handling.
+- `tests/test_v2_evaluation.py` (25 tests): Exact Appendix A schema, 50k–100k dataset size, dynamic theme/sentiment extraction, relative date resolution ("this month", "last month", named months), LLM planner structured validation, deterministic fallback, DataAgent tool invocation tracking, ComparisonAgent deltas, RAG natural-language retrieval, Scenario 3 hybrid flow, safe out-of-domain query handling, and the 12 mandatory production audit tests (date filtering using `date`, April/May non-zero partitions, theme keyword classification, sentiment derivation, non-collapsing theme aggregation, complaint negative volume ranking, channel and business filtering, schema invariance, and prohibition of derived labels).
 - `tests/test_orchestrator.py` (5 tests): LangGraph state machine flow, selective routing, and executive synthesis.
 - `tests/test_comparison_agent.py` (4 tests): Period deltas, channel comparison, zero-denominator safety guards.
 - `tests/test_data_agent.py` (6 tests): Explicit tool invocation, theme rankings, channel filtering, date range handling.

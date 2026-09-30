@@ -6,6 +6,13 @@ supporting deterministic metrics, retrieved FAQ chunks, and synthesized executiv
 """
 
 import json
+from pathlib import Path
+import sys
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
+
 from app.agents.orchestrator import OrchestratorAgent
 
 
@@ -24,6 +31,11 @@ def run_all_evaluations() -> None:
         ("Unseen 3 (Channel Comparison)", "Compare kiosk vs mobile channel satisfaction."),
         ("Unseen 4 (Pure RAG Policy Query)", "What does the FAQ say about handling customer complaints and refunds?"),
         ("Unseen 5 (Facility Complaint Themes)", "What are the main complaint themes across our facilities?"),
+
+        # 3 Additional Paraphrased Scenarios
+        ("Paraphrase 1 (Complaints Ranking)", "Which areas received the highest volume of customer complaints during the current month?"),
+        ("Paraphrase 2 (Longitudinal Delta)", "What was the difference in customer satisfaction ratings for wait times between April 2026 and May 2026?"),
+        ("Paraphrase 3 (Hybrid Policy & Analytics)", "How long should customers anticipate waiting for their orders according to policy, and how did recent pickup satisfaction perform?"),
     ]
 
     results = []

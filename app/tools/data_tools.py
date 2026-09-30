@@ -1,7 +1,7 @@
 """Deterministic numerical tools for survey analytics."""
 
 import re
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any, Union
 from app.models.schemas import PeriodComparisonResult, PeriodMetrics, ThemeMetric
 
@@ -70,7 +70,7 @@ for theme_name, kw_list in THEME_KEYWORDS.items():
 KEYWORD_TO_THEME.sort(key=lambda x: -len(x[0]))
 
 
-def classify_sentiment(rating: int | float | None) -> str:
+def derive_sentiment(rating: int | float | None) -> str:
     """Deterministically derive sentiment polarity from rating per specification.
 
     1-2 -> negative
@@ -90,6 +90,48 @@ def classify_sentiment(rating: int | float | None) -> str:
         return "neutral"
     else:
         return "positive"
+
+
+# Backwards compatibility alias
+classify_sentiment = derive_sentiment
+
+
+def normalize_theme_name(theme: str | None) -> str | None:
+    """Normalize input theme expression to canonical controlled taxonomy.
+
+    Strips any trailing brackets, braces, commas, or quotes and matches against
+    the 8 controlled taxonomy themes:
+      - Food Quality, Wait Time, Staff, Cleanliness, Pricing, Membership, Facilities, App Experience
+    """
+    if not theme or not str(theme).strip():
+        return None
+    cleaned = re.sub(r"[^\w\s-]", "", str(theme)).strip()
+    if not cleaned:
+        return None
+    cleaned_lower = cleaned.lower()
+
+    for canonical in THEMES:
+        if cleaned_lower == canonical.lower():
+            return canonical
+
+    if "wait" in cleaned_lower or "pickup" in cleaned_lower or "queue" in cleaned_lower or "delay" in cleaned_lower:
+        return "Wait Time"
+    if "food" in cleaned_lower or "meal" in cleaned_lower or "taste" in cleaned_lower or "salad" in cleaned_lower or "burger" in cleaned_lower or "flavor" in cleaned_lower:
+        return "Food Quality"
+    if "clean" in cleaned_lower or "dirty" in cleaned_lower or "restroom" in cleaned_lower or "hygiene" in cleaned_lower or "sanit" in cleaned_lower:
+        return "Cleanliness"
+    if "price" in cleaned_lower or "pricing" in cleaned_lower or "expensive" in cleaned_lower or "cost" in cleaned_lower or "bill" in cleaned_lower:
+        return "Pricing"
+    if "staff" in cleaned_lower or "employee" in cleaned_lower or "service" in cleaned_lower or "clerk" in cleaned_lower or "cashier" in cleaned_lower:
+        return "Staff"
+    if "app" in cleaned_lower or "mobile" in cleaned_lower or "crash" in cleaned_lower or "glitch" in cleaned_lower or "digital" in cleaned_lower:
+        return "App Experience"
+    if "member" in cleaned_lower or "loyalty" in cleaned_lower or "rewards" in cleaned_lower or "points" in cleaned_lower:
+        return "Membership"
+    if "facilit" in cleaned_lower or "patio" in cleaned_lower or "parking" in cleaned_lower or "seating" in cleaned_lower or "lounge" in cleaned_lower:
+        return "Facilities"
+
+    return cleaned
 
 
 def classify_theme(free_text: str | None) -> str:
@@ -115,17 +157,58 @@ def classify_theme(free_text: str | None) -> str:
     return max(scores.items(), key=lambda x: x[1])[0]
 
 
-def classify_record_theme(record: dict[str, Any]) -> str:
-    """Get or compute cached theme for an in-memory survey record."""
-    if "_theme" in record:
-        return record["_theme"]
-    explicit = record.get("theme") or record.get("category")
-    if explicit:
-        record["_theme"] = explicit
-        return explicit
-    derived = classify_theme(record.get("free_text") or record.get("feedback"))
-    record["_theme"] = derived
-    return derived
+def classify_record_theme(record: dict[str, Any] | Any) -> str:
+    """Classify the theme of a raw Appendix-A survey record from free_text.
+
+    Caches the derived theme in-memory on the record dict (_theme) to avoid redundant scans.
+    Never mutates persisted data files.
+    """
+    if isinstance(record, dict):
+        if "_theme" in record:
+            return record["_theme"]
+        # Primary: Appendix A free_text
+        free_text = record.get("free_text")
+        if free_text:
+            theme = classify_theme(free_text)
+            record["_theme"] = theme
+            return theme
+        # Secondary fallback for legacy compatibility
+        explicit = record.get("theme") or record.get("category") or record.get("feedback")
+        theme = classify_theme(explicit) if explicit else "General"
+        record["_theme"] = theme
+        return theme
+
+    if hasattr(record, "_theme") and record._theme:
+        return record._theme
+    text = getattr(record, "free_text", None) or getattr(record, "feedback", None)
+    theme = classify_theme(text)
+    try:
+        setattr(record, "_theme", theme)
+    except Exception:
+        pass
+    return theme
+
+
+def normalize_appendix_a_record(record: dict[str, Any]) -> dict[str, Any]:
+    """Runtime analytical normalization of a raw Appendix-A survey record.
+
+    Derives theme from free_text and sentiment from rating without modifying persisted data.
+    """
+    rating = record.get("rating", 3)
+    free_text = record.get("free_text", "")
+    return {
+        "response_id": record.get("response_id", ""),
+        "date": str(record.get("date", "")),
+        "business_id": record.get("business_id", ""),
+        "business_name": record.get("business_name", ""),
+        "survey_id": record.get("survey_id", ""),
+        "survey_name": record.get("survey_name", ""),
+        "rating": rating,
+        "response_channel": record.get("response_channel", ""),
+        "free_text": free_text,
+        "derived_theme": classify_record_theme(record),
+        "derived_sentiment": derive_sentiment(rating),
+    }
 
 
 def extract_themes(free_text: str | None) -> list[str]:
@@ -143,11 +226,16 @@ def extract_themes(free_text: str | None) -> list[str]:
 
 
 def _extract_score(item: Any) -> float | None:
-    """Helper to extract a numeric rating/score from an int, float, dict, or object."""
+    """Helper to extract a numeric rating from an int, float, dict, or object."""
     if isinstance(item, (int, float)):
         return float(item)
     if isinstance(item, dict):
-        for key in ("rating", "csat_score", "score", "value"):
+        if "rating" in item and item["rating"] is not None:
+            try:
+                return float(item["rating"])
+            except (ValueError, TypeError):
+                pass
+        for key in ("rating", "score", "value"):
             if key in item and item[key] is not None:
                 try:
                     return float(item[key])
@@ -155,65 +243,72 @@ def _extract_score(item: Any) -> float | None:
                     pass
         return None
     if hasattr(item, "rating"):
-        return float(item.rating)
-    if hasattr(item, "csat_score"):
-        return float(item.csat_score)
+        try:
+            return float(item.rating)
+        except (ValueError, TypeError):
+            pass
     return None
 
 
-def _parse_timestamp(ts: Any) -> datetime | None:
-    """Parse various timestamp representations into a UTC datetime."""
-    if ts is None:
+def _parse_date(d: Any) -> date | None:
+    """Parse date-only strings (YYYY-MM-DD), ISO datetimes, or dates into a date object."""
+    if d is None:
         return None
-    if isinstance(ts, datetime):
-        return ts if ts.tzinfo else ts.replace(tzinfo=timezone.utc)
-    if isinstance(ts, str):
-        cleaned = ts.strip()
+    if isinstance(d, datetime):
+        return d.date()
+    if isinstance(d, date):
+        return d
+    if isinstance(d, str):
+        cleaned = d.strip()
         if not cleaned:
             return None
-        # Handle ISO with Z
-        if cleaned.endswith("Z"):
-            cleaned = cleaned[:-1] + "+00:00"
-        try:
-            dt = datetime.fromisoformat(cleaned)
-            return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
-        except ValueError:
-            # Fallback to date-only string YYYY-MM-DD
+        # Handle standard YYYY-MM-DD
+        if len(cleaned) >= 10 and cleaned[4] == "-" and cleaned[7] == "-":
             try:
-                dt = datetime.strptime(cleaned[:10], "%Y-%m-%d")
-                return dt.replace(tzinfo=timezone.utc)
+                return datetime.strptime(cleaned[:10], "%Y-%m-%d").date()
             except ValueError:
-                return None
+                pass
+        # Handle full ISO format
+        try:
+            return datetime.fromisoformat(cleaned.replace("Z", "+00:00")).date()
+        except ValueError:
+            pass
     return None
 
 
 def filter_by_date(
     records: list[dict[str, Any]],
-    start_date: str | datetime | None = None,
-    end_date: str | datetime | None = None,
+    start_date: str | datetime | date | None = None,
+    end_date: str | datetime | date | None = None,
 ) -> list[dict[str, Any]]:
-    """Filter survey records deterministically by an inclusive date range.
+    """Filter survey records deterministically by inclusive date range.
 
-    Handles Appendix A 'date' (YYYY-MM-DD), ISO 'timestamp', and datetimes.
+    Operates primarily on the Appendix A 'date' field (YYYY-MM-DD).
+    Does NOT depend on a 'timestamp' field.
     """
     if not records:
         return []
 
-    start_dt = _parse_timestamp(start_date)
-    end_dt = _parse_timestamp(end_date)
+    start_d = _parse_date(start_date)
+    end_d = _parse_date(end_date)
 
-    # If end_date is date-only string (length 10 e.g. '2026-04-30'), extend to end of day
-    if isinstance(end_date, str) and len(end_date.strip()) == 10 and end_dt:
-        end_dt = end_dt.replace(hour=23, minute=59, second=59, microsecond=999999)
+    if start_d is None and end_d is None:
+        return records
 
     filtered: list[dict[str, Any]] = []
     for r in records:
-        record_dt = _parse_timestamp(r.get("date") or r.get("timestamp"))
-        if record_dt is None:
+        # Primary: Appendix A 'date' field
+        raw_date = r.get("date") if isinstance(r, dict) else getattr(r, "date", None)
+        if not raw_date:
+            # Secondary fallback for legacy payloads
+            raw_date = r.get("timestamp") if isinstance(r, dict) else getattr(r, "timestamp", None)
+
+        record_d = _parse_date(raw_date)
+        if record_d is None:
             continue
-        if start_dt and record_dt < start_dt:
+        if start_d and record_d < start_d:
             continue
-        if end_dt and record_dt > end_dt:
+        if end_d and record_d > end_d:
             continue
         filtered.append(r)
 
@@ -273,7 +368,7 @@ def count_responses(records: list[Any]) -> int:
 def compute_sentiment_breakdown(sentiments_or_records: list[Any]) -> dict[str, int]:
     """Compute frequency counts for survey sentiments (positive, neutral, negative).
 
-    Derives sentiment from rating deterministically if not explicitly labeled.
+    Derives sentiment from rating deterministically on raw Appendix-A records.
     """
     counts = {"positive": 0, "neutral": 0, "negative": 0}
     if not sentiments_or_records:
@@ -284,13 +379,15 @@ def compute_sentiment_breakdown(sentiments_or_records: list[Any]) -> dict[str, i
         if isinstance(item, str):
             sentiment_val = item
         elif isinstance(item, dict):
-            sentiment_val = item.get("sentiment")
-            if not sentiment_val and "rating" in item:
-                sentiment_val = classify_sentiment(item["rating"])
-        elif hasattr(item, "sentiment") and item.sentiment:
-            sentiment_val = item.sentiment
+            # Primary: derive sentiment from rating (Appendix A)
+            if "rating" in item and item["rating"] is not None:
+                sentiment_val = derive_sentiment(item["rating"])
+            elif "sentiment" in item:
+                sentiment_val = item["sentiment"]
         elif hasattr(item, "rating"):
-            sentiment_val = classify_sentiment(item.rating)
+            sentiment_val = derive_sentiment(item.rating)
+        elif hasattr(item, "sentiment"):
+            sentiment_val = item.sentiment
 
         norm = (sentiment_val or "").lower().strip()
         if norm in counts:
@@ -307,7 +404,8 @@ def get_top_themes(
 ) -> list[ThemeMetric]:
     """Extract aggregated theme metrics ranked deterministically.
 
-    Derives themes from free_text deterministically if not explicitly pre-labeled.
+    Derives themes from free_text deterministically when analyzing raw Appendix-A records.
+    Never collapses all records into 'General' merely because the old 'theme' field is absent.
     Supported sorting metrics:
       - 'volume': highest count first (default)
       - 'csat_asc' / 'worst_csat': lowest CSAT first (complaint driver analysis)
@@ -317,7 +415,7 @@ def get_top_themes(
     if not records:
         return []
 
-    # Group by theme (derived or pre-labeled, using in-memory cache)
+    # Group by theme (derived dynamically from free_text using in-memory cache)
     groups: dict[str, list[dict[str, Any]]] = {}
     for r in records:
         theme = classify_record_theme(r)
@@ -358,25 +456,49 @@ def get_top_themes(
 
 def compare_period_metrics(
     records: list[dict[str, Any]],
-    period_a_start: str | datetime | None,
-    period_a_end: str | datetime | None,
-    period_b_start: str | datetime | None,
-    period_b_end: str | datetime | None,
+    period_a_start: str | datetime | date | None,
+    period_a_end: str | datetime | date | None,
+    period_b_start: str | datetime | date | None,
+    period_b_end: str | datetime | date | None,
     theme: str | None = None,
+    response_channel: str | None = None,
+    business_id: str | None = None,
+    channel: str | None = None,
     cohort: str | None = None,
     label_a: str = "Period A",
     label_b: str = "Period B",
 ) -> PeriodComparisonResult:
-    """Compare performance metrics between two periods with delta analysis."""
+    """Compare performance metrics between two periods with delta analysis on raw Appendix-A records."""
     pool = records
-    if theme:
-        target = theme.lower().strip()
+
+    # 1. Theme filtering using runtime classifier over free_text
+    norm_theme = normalize_theme_name(theme)
+    if norm_theme:
+        target_lower = norm_theme.lower()
         pool = [
             r for r in pool
-            if classify_record_theme(r).lower() == target
+            if classify_record_theme(r).lower() == target_lower
         ]
-    if cohort:
-        pool = [r for r in pool if r.get("cohort", "").lower() == cohort.lower()]
+
+    # 2. Channel filtering using Appendix A response_channel
+    target_channel = (response_channel or channel or cohort or "").lower().strip()
+    if target_channel:
+        pool = [
+            r for r in pool
+            if (
+                str(r.get("response_channel", "")).lower() == target_channel
+                or str(r.get("channel", "")).lower() == target_channel
+                or str(r.get("cohort", "")).lower() == target_channel
+            )
+        ]
+
+    # 3. Location filtering using Appendix A business_id
+    if business_id:
+        target_biz = business_id.lower().strip()
+        pool = [
+            r for r in pool
+            if str(r.get("business_id", "")).lower() == target_biz
+        ]
 
     records_a = filter_by_date(pool, period_a_start, period_a_end)
     records_b = filter_by_date(pool, period_b_start, period_b_end)
@@ -472,38 +594,42 @@ def filter_surveys(
     category: str | None = None,
     theme: str | None = None,
     channel: str | None = None,
+    response_channel: str | None = None,
     business_id: str | None = None,
+    business_name: str | None = None,
+    survey_id: str | None = None,
+    survey_name: str | None = None,
 ) -> list[dict[str, Any]]:
-    """Filter survey records deterministically by cohort, category/theme, channel, or business."""
+    """Filter survey records deterministically by Appendix A fields or runtime derived themes.
+
+    Primary Appendix A filters:
+      - response_channel / channel
+      - business_id
+      - business_name
+      - survey_id
+      - survey_name
+      - theme / category (evaluated dynamically via free_text runtime derivation)
+    """
     if not records:
         return []
     filtered = records
 
-    target_theme = (theme or category or "").lower().strip()
-    if target_theme:
+    norm_theme = normalize_theme_name(theme or category)
+    if norm_theme:
+        target_lower = norm_theme.lower()
         filtered = [
             r for r in filtered
-            if classify_record_theme(r).lower() == target_theme
+            if classify_record_theme(r).lower() == target_lower
         ]
 
-    if cohort:
-        target_cohort = cohort.lower().strip()
+    target_chan = (response_channel or channel or cohort or "").lower().strip()
+    if target_chan:
         filtered = [
             r for r in filtered
             if (
-                r.get("cohort", "").lower() == target_cohort
-                or r.get("response_channel", "").lower() == target_cohort
-                or r.get("channel", "").lower() == target_cohort
-            )
-        ]
-
-    if channel:
-        target_channel = channel.lower().strip()
-        filtered = [
-            r for r in filtered
-            if (
-                r.get("response_channel", "").lower() == target_channel
-                or r.get("channel", "").lower() == target_channel
+                str(r.get("response_channel", "")).lower() == target_chan
+                or str(r.get("channel", "")).lower() == target_chan
+                or str(r.get("cohort", "")).lower() == target_chan
             )
         ]
 
@@ -511,7 +637,28 @@ def filter_surveys(
         target_biz = business_id.lower().strip()
         filtered = [
             r for r in filtered
-            if r.get("business_id", "").lower() == target_biz
+            if str(r.get("business_id", "")).lower() == target_biz
+        ]
+
+    if business_name:
+        target_biz_name = business_name.lower().strip()
+        filtered = [
+            r for r in filtered
+            if str(r.get("business_name", "")).lower() == target_biz_name
+        ]
+
+    if survey_id:
+        target_survey_id = survey_id.lower().strip()
+        filtered = [
+            r for r in filtered
+            if str(r.get("survey_id", "")).lower() == target_survey_id
+        ]
+
+    if survey_name:
+        target_survey_name = survey_name.lower().strip()
+        filtered = [
+            r for r in filtered
+            if str(r.get("survey_name", "")).lower() == target_survey_name
         ]
 
     return filtered

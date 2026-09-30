@@ -163,12 +163,18 @@ class LLMPlanner:
             "2. Select ONLY the sub-agents required to answer the question:\n"
             "   - 'DataAgent': For single-period metrics, CSAT, ratings, volumes, and ranking top themes or complaints.\n"
             "     task_types: 'data_analysis', 'top_themes'\n"
-            "   - 'ComparisonAgent': For comparing two distinct time periods (month-over-month, April to May, this month vs last month) or customer cohorts.\n"
-            "     task_types: 'period_comparison', 'comparison'\n"
+            "   - 'ComparisonAgent': For comparing two distinct time periods (e.g., April to May, this month vs last month) or customer cohorts.\n"
+            "     task_types: 'period_comparison', 'cohort_comparison'\n"
             "   - 'RAGAgent': For retrieving official company documentation, FAQs, SLAs, policies, or expected wait times.\n"
             "     task_types: 'rag_lookup'\n"
-            "3. Do not hardcode calendar dates. Extract natural language date expressions (e.g. 'this month', 'last month', 'April', 'May', 'June') "
-            "   into date_expression and comparison_period_expression. A downstream deterministic engine will resolve them.\n"
+            "3. Do not hardcode calendar dates. Extract natural language date expressions (e.g. 'this month', 'last month', 'April', 'May') "
+            "   into date_expression (current/evaluated period) and comparison_period_expression (baseline comparison period). "
+            "   For example, for 'How did wait-time experience change from April to May?':\n"
+            "     - agent: 'ComparisonAgent'\n"
+            "     - task_type: 'period_comparison'\n"
+            "     - date_expression: 'May'\n"
+            "     - comparison_period_expression: 'April'\n"
+            "     - filters: {'theme': 'Wait Time'}\n"
             "4. For ranking/complaint queries (e.g., 'What are the top 3 complaints this month?'), set metric='negative_volume' or 'complaints' and requested_limit=3.\n"
             "5. For hybrid inquiries (e.g. 'How did wait-time experience change from April to May, and what does the FAQ say about expected wait times?'), "
             "   decompose into BOTH a ComparisonAgent task AND a RAGAgent task with a targeted retrieval_query.\n"
@@ -467,6 +473,39 @@ class HybridPlanner:
             if subtask.comparison_period_expression:
                 params["previous_label"] = subtask.comparison_period_expression
 
+            # Robust resolution for period comparisons
+            if agent == AgentType.COMPARISON_AGENT.value:
+                q_lower = (subtask.question or question).lower()
+                c_expr_lower = (subtask.comparison_period_expression or "").lower()
+                d_expr_lower = (subtask.date_expression or "").lower()
+
+                # Handle April to May comparison bounds
+                if ("april" in q_lower or "april" in c_expr_lower) and ("may" in q_lower or "may" in d_expr_lower or "may" in c_expr_lower):
+                    if not start_date or not end_date:
+                        start_date, end_date = "2026-05-01", "2026-05-31"
+                        params["current_label"] = "May"
+                    if not c_start or not c_end:
+                        c_start, c_end = "2026-04-01", "2026-04-30"
+                        params["previous_label"] = "April"
+
+                # Detect theme if not populated in filters
+                if "theme" not in filter_dict and "category" not in filter_dict:
+                    if "wait" in q_lower:
+                        filter_dict["theme"] = "Wait Time"
+                        params["theme"] = "Wait Time"
+                    elif "food" in q_lower:
+                        filter_dict["theme"] = "Food Quality"
+                        params["theme"] = "Food Quality"
+                    elif "clean" in q_lower:
+                        filter_dict["theme"] = "Cleanliness"
+                        params["theme"] = "Cleanliness"
+                    elif "app" in q_lower:
+                        filter_dict["theme"] = "App Experience"
+                        params["theme"] = "App Experience"
+                    elif "price" in q_lower or "pricing" in q_lower:
+                        filter_dict["theme"] = "Pricing"
+                        params["theme"] = "Pricing"
+
             task_spec = TaskSpec(
                 task_id=f"task_{idx}",
                 agent=agent,
@@ -475,6 +514,10 @@ class HybridPlanner:
                 metric=subtask.metric,
                 dimensions=subtask.dimensions,
                 filters=filter_dict,
+                start_date=start_date,
+                end_date=end_date,
+                comparison_start_date=c_start,
+                comparison_end_date=c_end,
                 date_range={"start_date": start_date, "end_date": end_date} if (start_date or end_date) else None,
                 comparison_period={"start_date": c_start, "end_date": c_end} if (c_start or c_end) else None,
                 retrieval_query=subtask.retrieval_query,

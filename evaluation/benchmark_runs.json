@@ -18,7 +18,7 @@
         "comparison_period": null,
         "retrieval_query": null,
         "requested_limit": 3,
-        "rationale": "To identify the most significant complaints, we need to analyze the negative volume of feedback for this month.",
+        "rationale": "To identify the most significant complaints, we need to analyze the negative volume of feedback.",
         "start_date": "2026-05-01",
         "end_date": "2026-05-31",
         "comparison_start_date": null,
@@ -34,7 +34,7 @@
         "instruction": null
       }
     ],
-    "answer": "This month, the top three complaints identified from the survey metrics are related to Pricing, Membership, and Facilities. Specifically, the Pricing theme received 4,615 mentions, with an average rating of 2.62 and a customer satisfaction (CSAT) score of 19.52, indicating significant dissatisfaction. The Membership theme had 5,031 mentions, with a higher average rating of 3.68 and a CSAT of 62.93, suggesting a more favorable perception but still with some negative feedback (855 negative mentions). Lastly, the Facilities theme garnered 5,683 mentions, achieving an average rating of 3.78 and a CSAT of 66.78, reflecting a relatively positive sentiment compared to the other themes. It is important to note that no additional operational context or policy details were available from the FAQ sources to further interpret these complaints.",
+    "answer": "This month, the top three complaints identified from the survey data are related to Pricing, Membership, and Facilities. The Pricing theme received 4,615 mentions, with an average rating of 2.62 and a customer satisfaction score (CSAT) of 19.52, indicating significant dissatisfaction. Membership complaints totaled 5,031, achieving a higher average rating of 3.68 and a CSAT of 62.93, reflecting a more favorable perception compared to Pricing. Lastly, Facilities garnered 5,683 mentions, with an average rating of 3.78 and a CSAT of 66.78, suggesting a relatively positive experience in this area. It is important to note that the data does not include any specific operational context or policy changes that may have influenced these sentiments.",
     "supporting_metrics": {
       "survey_metrics": {
         "response_count": 38114,
@@ -78,51 +78,58 @@
         "task_id": "task_1",
         "agent": "ComparisonAgent",
         "task_type": "period_comparison",
-        "question": "Analyze the change in wait-time experience from April to May.",
+        "question": "How did wait-time experience change from April to May?",
         "metric": null,
         "dimensions": [],
-        "filters": {},
-        "date_range": null,
+        "filters": {
+          "theme": "Wait Time},"
+        },
+        "date_range": {
+          "start_date": "2026-05-01",
+          "end_date": "2026-05-31"
+        },
         "comparison_period": {
           "start_date": "2026-04-01",
           "end_date": "2026-04-30"
         },
         "retrieval_query": null,
         "requested_limit": 5,
-        "rationale": "To assess the change in wait-time experience, a comparison of the two specified months is necessary.",
-        "start_date": null,
-        "end_date": null,
+        "rationale": "To analyze the change in wait-time experience between the specified months.",
+        "start_date": "2026-05-01",
+        "end_date": "2026-05-31",
         "comparison_start_date": "2026-04-01",
         "comparison_end_date": "2026-04-30",
         "parameters": {
+          "theme": "Wait Time},",
           "top_n": 5,
+          "current_label": "May",
           "previous_label": "April"
         },
         "instruction": null
       }
     ],
-    "answer": "Between April and May, the wait-time experience showed a decline in customer satisfaction and average ratings. In April, the measured customer satisfaction (CSAT) was 53.21 with an average rating of 3.39, based on a volume of 36,886 responses. In contrast, May recorded a CSAT of 62.59 and an average rating of 3.7 from 38,114 responses. This indicates a decrease in CSAT by 9.38 points, or approximately 14.99%, and a drop in the average rating by 0.31 points, equating to an 8.38% decline. Additionally, there was a reduction in response volume by 1,228, representing a 3.22% decrease. Unfortunately, no specific operational context or policy changes were provided to explain these shifts, as no relevant FAQ sources were retrieved.",
+    "answer": "Between April and May, there was a significant improvement in the wait-time experience as reflected in the survey metrics. In May, the measured customer satisfaction (CSAT) was 60.95, a notable increase of 48.44 points from April's CSAT of 12.51, representing a percentage change of 387.21%. Additionally, the average rating rose from 2.13 in April to 3.74 in May, marking an increase of 1.61 points or 75.59%. The volume of responses also saw a slight increase, with 5022 responses in May compared to 4988 in April, indicating a 0.68% growth. While these metrics demonstrate a clear enhancement in customer sentiment regarding wait times, there are no available FAQ sources to provide further operational context or policy insights related to these changes.",
     "supporting_metrics": {
       "comparison": {
         "current_period": {
-          "label": "April",
-          "count": 36886,
-          "average_rating": 3.39,
-          "csat": 53.21
+          "label": "May",
+          "count": 5022,
+          "average_rating": 3.74,
+          "csat": 60.95
         },
         "previous_period": {
-          "label": "May",
-          "count": 38114,
-          "average_rating": 3.7,
-          "csat": 62.59
+          "label": "April",
+          "count": 4988,
+          "average_rating": 2.13,
+          "csat": 12.51
         },
         "metric_changes": {
-          "csat_delta": -9.38,
-          "csat_pct_change": -14.99,
-          "average_rating_delta": -0.31,
-          "average_rating_pct_change": -8.38,
-          "count_delta": -1228.0,
-          "count_pct_change": -3.22
+          "csat_delta": 48.44,
+          "csat_pct_change": 387.21,
+          "average_rating_delta": 1.61,
+          "average_rating_pct_change": 75.59,
+          "count_delta": 34.0,
+          "count_pct_change": 0.68
         }
       }
     },
@@ -143,26 +150,29 @@
         "question": "How did wait-time experience change from April to May?",
         "metric": null,
         "dimensions": [],
-        "filters": {},
-        "date_range": {
-          "start_date": "2026-04-01",
-          "end_date": "2026-04-30"
+        "filters": {
+          "theme": "Wait Time},"
         },
-        "comparison_period": {
+        "date_range": {
           "start_date": "2026-05-01",
           "end_date": "2026-05-31"
         },
+        "comparison_period": {
+          "start_date": "2026-04-01",
+          "end_date": "2026-04-30"
+        },
         "retrieval_query": null,
         "requested_limit": 5,
-        "rationale": "To analyze the change in wait-time experience between the specified months.",
-        "start_date": "2026-04-01",
-        "end_date": "2026-04-30",
-        "comparison_start_date": "2026-05-01",
-        "comparison_end_date": "2026-05-31",
+        "rationale": "To analyze the change in wait-time experience.",
+        "start_date": "2026-05-01",
+        "end_date": "2026-05-31",
+        "comparison_start_date": "2026-04-01",
+        "comparison_end_date": "2026-04-30",
         "parameters": {
+          "theme": "Wait Time},",
           "top_n": 5,
-          "current_label": "April",
-          "previous_label": "May"
+          "current_label": "May",
+          "previous_label": "April"
         },
         "instruction": null
       },
@@ -170,13 +180,13 @@
         "task_id": "task_2",
         "agent": "RAGAgent",
         "task_type": "rag_lookup",
-        "question": "How did wait-time experience change from April to May, and what does the FAQ say about expected wait times?",
+        "question": "What does the FAQ say about expected wait times?",
         "metric": null,
         "dimensions": [],
         "filters": {},
         "date_range": null,
         "comparison_period": null,
-        "retrieval_query": "What does the FAQ say about expected wait times?",
+        "retrieval_query": "expected wait times",
         "requested_limit": 5,
         "rationale": "To retrieve information from the FAQ regarding expected wait times.",
         "start_date": null,
@@ -185,34 +195,34 @@
         "comparison_end_date": null,
         "parameters": {
           "top_n": 5,
-          "query": "What does the FAQ say about expected wait times?",
+          "query": "expected wait times",
           "top_k": 5
         },
         "instruction": null
       }
     ],
-    "answer": "From April to May, the wait-time experience showed a notable improvement, with customer satisfaction (CSAT) increasing from 53.21 in April to 62.59 in May, despite a decrease in the average rating from 3.39 to 3.7. The volume of responses also decreased slightly by 3.22%. According to our operational standards, we aim for wait times under 10 minutes during off-peak hours, while peak hours may experience waits of 15-20 minutes due to higher order volumes. Additionally, starting May 1st, we implemented dedicated express pickup stations to streamline the process for mobile orders, which may have contributed to the improved customer experience.",
+    "answer": "From April to May, there was a significant improvement in wait-time experience, as evidenced by the metrics: customer satisfaction (CSAT) rose from 12.51 to 60.95, reflecting a delta of 48.44, and the average rating increased from 2.13 to 3.74, a change of 1.61. The volume of responses also saw a slight increase of 34.0. According to our operational standards, we aim for wait times under 10 minutes during off-peak hours, while peak hours may experience waits of 15-20 minutes due to higher order volumes. Additionally, starting May 1st, the introduction of dedicated express pickup stations and real-time kitchen tracking notifications for mobile orders were implemented to further enhance the customer experience and reduce in-store waiting times.",
     "supporting_metrics": {
       "comparison": {
         "current_period": {
-          "label": "April",
-          "count": 36886,
-          "average_rating": 3.39,
-          "csat": 53.21
+          "label": "May",
+          "count": 5022,
+          "average_rating": 3.74,
+          "csat": 60.95
         },
         "previous_period": {
-          "label": "May",
-          "count": 38114,
-          "average_rating": 3.7,
-          "csat": 62.59
+          "label": "April",
+          "count": 4988,
+          "average_rating": 2.13,
+          "csat": 12.51
         },
         "metric_changes": {
-          "csat_delta": -9.38,
-          "csat_pct_change": -14.99,
-          "average_rating_delta": -0.31,
-          "average_rating_pct_change": -8.38,
-          "count_delta": -1228.0,
-          "count_pct_change": -3.22
+          "csat_delta": 48.44,
+          "csat_pct_change": 387.21,
+          "average_rating_delta": 1.61,
+          "average_rating_pct_change": 75.59,
+          "count_delta": 34.0,
+          "count_pct_change": 0.68
         }
       }
     },
@@ -231,12 +241,12 @@
       {
         "task_id": "task_1",
         "agent": "DataAgent",
-        "task_type": "top_themes",
+        "task_type": "data_analysis",
         "question": "What are customers saying about food quality?",
-        "metric": "complaints",
+        "metric": "negative_volume",
         "dimensions": [],
         "filters": {
-          "theme": "food quality"
+          "theme": "Food Quality},"
         },
         "date_range": {
           "start_date": "2026-05-01",
@@ -245,15 +255,15 @@
         "comparison_period": null,
         "retrieval_query": null,
         "requested_limit": 5,
-        "rationale": "To identify the themes and sentiments related to food quality complaints this month.",
+        "rationale": "Analyzing customer feedback on food quality for the current month.",
         "start_date": "2026-05-01",
         "end_date": "2026-05-31",
         "comparison_start_date": null,
         "comparison_end_date": null,
         "parameters": {
-          "theme": "food quality",
-          "metric": "complaints",
-          "metric_name": "complaints",
+          "theme": "Food Quality},",
+          "metric": "negative_volume",
+          "metric_name": "negative_volume",
           "theme_metric": "negative_volume",
           "sentiment": "negative",
           "top_n": 5,
@@ -262,7 +272,7 @@
         "instruction": null
       }
     ],
-    "answer": "This month, customer feedback regarding food quality has been captured through a survey with a total response count of 4,914. The average rating for food quality stands at 4.06, and the customer satisfaction score (CSAT) is 77.39. While the majority of responses reflect a positive sentiment, it is noteworthy that there were 446 negative comments related to food quality. Unfortunately, there are no available FAQ sources to provide additional context or operational standards regarding food quality at this time.",
+    "answer": "This month, customer feedback regarding food quality reflects a generally positive sentiment, with an average rating of 4.06 out of 5 and a customer satisfaction score (CSAT) of 77.39%. Out of 4,914 responses, 446 were categorized as negative, indicating that while the majority of customers are satisfied, there is a notable segment expressing concerns. Unfortunately, there are no available FAQ sources to provide additional operational context or insights into specific policies related to food quality.",
     "supporting_metrics": {
       "survey_metrics": {
         "response_count": 4914,
@@ -292,11 +302,11 @@
         "task_id": "task_1",
         "agent": "DataAgent",
         "task_type": "data_analysis",
-        "question": "Analyze cleanliness satisfaction for May to identify reasons for the drop.",
+        "question": "Analyze cleanliness satisfaction for May.",
         "metric": "csat",
         "dimensions": [],
         "filters": {
-          "theme": "cleanliness},"
+          "theme": "Cleanliness},"
         },
         "date_range": {
           "start_date": "2026-05-01",
@@ -305,13 +315,13 @@
         "comparison_period": null,
         "retrieval_query": null,
         "requested_limit": 5,
-        "rationale": "To analyze the cleanliness satisfaction specifically for May.",
+        "rationale": "To understand the cleanliness satisfaction level in May.",
         "start_date": "2026-05-01",
         "end_date": "2026-05-31",
         "comparison_start_date": null,
         "comparison_end_date": null,
         "parameters": {
-          "theme": "cleanliness},",
+          "theme": "Cleanliness},",
           "metric": "csat",
           "metric_name": "csat",
           "top_n": 5,
@@ -320,13 +330,21 @@
         "instruction": null
       }
     ],
-    "answer": "Data regarding cleanliness satisfaction for May is unavailable, as there were no survey responses recorded during that period, resulting in a CSAT of 0.0 and an average rating of 0.0. Consequently, we cannot ascertain specific reasons for any potential drop in satisfaction related to cleanliness, nor do we have operational context from FAQ sources to inform this inquiry. Further investigation may be necessary to understand any underlying issues that could have contributed to this lack of feedback.",
+    "answer": "The cleanliness satisfaction metric experienced a decline in May, with a measured average rating of 3.84 and a customer satisfaction (CSAT) score of 71.46 based on 3,966 responses. Notably, there were 574 negative comments related to cleanliness, indicating a significant area of concern among customers. Unfortunately, without specific operational context or insights from our FAQ sources, we cannot definitively identify the reasons behind this drop in satisfaction. Further investigation into customer feedback and operational practices during this period may be necessary to understand the underlying factors contributing to the decline.",
     "supporting_metrics": {
       "survey_metrics": {
-        "response_count": 0,
-        "average_rating": 0.0,
-        "csat": 0.0,
-        "top_themes": []
+        "response_count": 3966,
+        "average_rating": 3.84,
+        "csat": 71.46,
+        "top_themes": [
+          {
+            "theme": "Cleanliness",
+            "count": 3966,
+            "average_rating": 3.84,
+            "csat": 71.46,
+            "negative_count": 574
+          }
+        ]
       }
     },
     "retrieved_sources": [],
@@ -341,8 +359,8 @@
       {
         "task_id": "task_1",
         "agent": "ComparisonAgent",
-        "task_type": "comparison",
-        "question": "Compare customer satisfaction between kiosk and mobile channels.",
+        "task_type": "cohort_comparison",
+        "question": "Compare satisfaction between kiosk and mobile channels.",
         "metric": "csat",
         "dimensions": [
           "channel"
@@ -354,7 +372,7 @@
         "comparison_period": null,
         "retrieval_query": null,
         "requested_limit": 5,
-        "rationale": "To compare satisfaction metrics between the kiosk and mobile channels.",
+        "rationale": "To compare customer satisfaction between the kiosk and mobile channels.",
         "start_date": null,
         "end_date": null,
         "comparison_start_date": null,
@@ -366,22 +384,51 @@
           "top_n": 5
         },
         "instruction": null
+      },
+      {
+        "task_id": "task_2",
+        "agent": "ComparisonAgent",
+        "task_type": "cohort_comparison",
+        "question": "Compare satisfaction between kiosk and mobile channels.",
+        "metric": "csat",
+        "dimensions": [
+          "channel"
+        ],
+        "filters": {
+          "response_channel": "mobile"
+        },
+        "date_range": null,
+        "comparison_period": null,
+        "retrieval_query": null,
+        "requested_limit": 5,
+        "rationale": "To compare customer satisfaction between the kiosk and mobile channels.",
+        "start_date": null,
+        "end_date": null,
+        "comparison_start_date": null,
+        "comparison_end_date": null,
+        "parameters": {
+          "response_channel": "mobile",
+          "metric": "csat",
+          "metric_name": "csat",
+          "top_n": 5
+        },
+        "instruction": null
       }
     ],
-    "answer": "In comparing customer satisfaction between the kiosk and mobile channels, both the current and previous periods show a consistent customer satisfaction score (CSAT) of 57.98 and an average rating of 3.55, based on a total of 75,000 responses for each period. There have been no changes in these metrics, indicating stability in customer perceptions across both channels during this timeframe. However, it is important to note that there are no available FAQ sources to provide additional operational context or policy interpretations related to these channels.",
+    "answer": "In comparing customer satisfaction between the kiosk and mobile channels, both the current and previous periods reflect identical metrics, with a customer satisfaction score (CSAT) of 57.94 and an average rating of 3.55, based on a consistent volume of 18,436 responses. There have been no changes in these metrics over the observed periods, indicating stable performance across both channels. However, it is important to note that no additional operational context or policy information is available from our FAQ sources to further interpret these findings.",
     "supporting_metrics": {
       "comparison": {
         "current_period": {
           "label": "Current Period",
-          "count": 75000,
+          "count": 18436,
           "average_rating": 3.55,
-          "csat": 57.98
+          "csat": 57.94
         },
         "previous_period": {
           "label": "Previous Period",
-          "count": 75000,
+          "count": 18436,
           "average_rating": 3.55,
-          "csat": 57.98
+          "csat": 57.94
         },
         "metric_changes": {
           "csat_delta": 0.0,
@@ -407,28 +454,52 @@
         "task_id": "task_1",
         "agent": "RAGAgent",
         "task_type": "rag_lookup",
-        "question": "What does the FAQ say about handling customer complaints and refunds?",
+        "question": "What does the FAQ say about handling customer complaints?",
         "metric": null,
         "dimensions": [],
         "filters": {},
         "date_range": null,
         "comparison_period": null,
-        "retrieval_query": "handling customer complaints and refunds FAQ",
+        "retrieval_query": "handling customer complaints FAQ.",
         "requested_limit": 5,
-        "rationale": "The task is to retrieve specific information from the FAQ regarding customer complaints and refunds.",
+        "rationale": "To retrieve information on handling customer complaints from the FAQ.",
         "start_date": null,
         "end_date": null,
         "comparison_start_date": null,
         "comparison_end_date": null,
         "parameters": {
           "top_n": 5,
-          "query": "handling customer complaints and refunds FAQ",
+          "query": "handling customer complaints FAQ.",
+          "top_k": 5
+        },
+        "instruction": null
+      },
+      {
+        "task_id": "task_2",
+        "agent": "RAGAgent",
+        "task_type": "rag_lookup",
+        "question": "What does the FAQ say about refunds?",
+        "metric": null,
+        "dimensions": [],
+        "filters": {},
+        "date_range": null,
+        "comparison_period": null,
+        "retrieval_query": "refunds FAQ.",
+        "requested_limit": 5,
+        "rationale": "To retrieve information on handling refunds from the FAQ.",
+        "start_date": null,
+        "end_date": null,
+        "comparison_start_date": null,
+        "comparison_end_date": null,
+        "parameters": {
+          "top_n": 5,
+          "query": "refunds FAQ.",
           "top_k": 5
         },
         "instruction": null
       }
     ],
-    "answer": "The company's approach to handling customer complaints and refunds is structured to ensure prompt resolution and customer satisfaction. All complaints are escalated to a shift manager within 15 minutes, and in cases of quality issues, refunds or replacements are provided. Additionally, if an order is delayed beyond 20 minutes due to unforeseen kitchen bottlenecks, supervisors can issue complimentary beverage vouchers or loyalty points to affected customers. Daily shift debriefs are conducted to review guest feedback, which facilitates the swift resolution of operational issues. This operational framework underscores our commitment to addressing customer concerns effectively.",
+    "answer": "The company's approach to handling customer complaints and refunds is structured to ensure prompt resolution and customer satisfaction. All complaints are escalated to a shift manager within 15 minutes, and for quality-related issues, refunds or replacements are provided. In instances where an order exceeds 20 minutes due to unforeseen kitchen delays, supervisors can issue immediate complimentary beverage vouchers or loyalty points. Additionally, daily shift debriefs are conducted to review guest feedback collected through digital receipts or counter cards, facilitating swift resolution of operational issues. However, there are no empirical survey metrics available to assess customer satisfaction related to these processes at this time.",
     "supporting_metrics": {},
     "retrieved_sources": [
       "faq_chunk_3: ## Q3: How do you handle complaints?\nAll complaints are escalated to the shift manager within 15 minutes. Refunds or replacements are offered for quality issues. If an order takes longer than 20 minutes due to unexpected kitchen bottlenecks, supervisors are empowered to issue immediate complimentary beverage vouchers or GreenLeaf loyalty points. We conduct daily shift debriefs to review all guest feedback submitted via digital receipts or counter cards, ensuring operational issues are resolved swiftly."
@@ -445,15 +516,17 @@
         "task_id": "task_1",
         "agent": "DataAgent",
         "task_type": "top_themes",
-        "question": "What are the main complaint themes across our facilities?",
+        "question": "Identify the main complaint themes across facilities.",
         "metric": "complaints",
-        "dimensions": [],
+        "dimensions": [
+          "theme"
+        ],
         "filters": {},
         "date_range": null,
         "comparison_period": null,
         "retrieval_query": null,
         "requested_limit": 5,
-        "rationale": "Identifying top complaint themes requires analyzing complaint data.",
+        "rationale": "To find the main complaint themes, we need to analyze the complaint data and rank the themes.",
         "start_date": null,
         "end_date": null,
         "comparison_start_date": null,
@@ -468,7 +541,7 @@
         "instruction": null
       }
     ],
-    "answer": "The main complaint themes across our facilities, based on survey data from 75,000 responses, highlight several areas of concern. The most significant theme is \"Wait Time,\" with 10,010 mentions, an average rating of 2.94, and a CSAT of 36.81, indicating substantial dissatisfaction. Following this, the \"App Experience\" theme received 8,771 mentions, with an average rating of 3.06 and a CSAT of 40.35. \"Pricing\" also emerged as a notable concern, with 8,742 mentions, an average rating of 2.93, and a CSAT of 30.12. In contrast, the \"Membership\" theme, while still receiving 9,788 mentions, had a higher average rating of 3.7 and a CSAT of 63.65, suggesting a more favorable perception. Lastly, the \"Facilities\" theme garnered 10,835 mentions, with an average rating of 3.76 and a CSAT of 66.05, indicating relatively better satisfaction compared to the other themes. Overall, the data suggests that addressing wait times, app experience, and pricing could significantly enhance customer satisfaction.",
+    "answer": "The primary complaint themes across our facilities, based on survey data from 75,000 responses, highlight significant areas for improvement. The most prevalent issue is related to wait times, with 10,010 mentions, an average rating of 2.94, and a customer satisfaction (CSAT) score of 36.81. The app experience follows closely, with 8,771 mentions, an average rating of 3.06, and a CSAT of 40.35. Pricing concerns are also notable, with 8,742 mentions, an average rating of 2.93, and a CSAT of 30.12. In contrast, membership-related feedback is more favorable, with 9,788 mentions, an average rating of 3.7, and a CSAT of 63.65. Lastly, facilities received 10,835 mentions, an average rating of 3.76, and a CSAT of 66.05. These metrics indicate that while membership and facilities are viewed positively, wait times, app experience, and pricing are critical areas requiring attention to enhance overall customer satisfaction.",
     "supporting_metrics": {
       "survey_metrics": {
         "response_count": 75000,
@@ -514,6 +587,249 @@
       }
     },
     "retrieved_sources": [],
+    "assumptions": [
+      "CSAT is defined deterministically as the percentage of survey ratings >= 4 out of 5."
+    ]
+  },
+  {
+    "category": "Paraphrase 1 (Complaints Ranking)",
+    "question": "Which areas received the highest volume of customer complaints during the current month?",
+    "tasks": [
+      {
+        "task_id": "task_1",
+        "agent": "DataAgent",
+        "task_type": "top_themes",
+        "question": "Identify the areas with the highest volume of customer complaints.",
+        "metric": "negative_volume",
+        "dimensions": [
+          "theme"
+        ],
+        "filters": {},
+        "date_range": {
+          "start_date": "2026-05-01",
+          "end_date": "2026-05-31"
+        },
+        "comparison_period": null,
+        "retrieval_query": null,
+        "requested_limit": 5,
+        "rationale": "To find the areas with the highest volume of complaints, we need to analyze the complaint data for the current month.",
+        "start_date": "2026-05-01",
+        "end_date": "2026-05-31",
+        "comparison_start_date": null,
+        "comparison_end_date": null,
+        "parameters": {
+          "metric": "negative_volume",
+          "metric_name": "negative_volume",
+          "theme_metric": "negative_volume",
+          "sentiment": "negative",
+          "top_n": 5,
+          "current_label": "this month"
+        },
+        "instruction": null
+      }
+    ],
+    "answer": "During the current month, the areas receiving the highest volume of customer complaints were as follows: Facilities with 5,683 complaints, Membership with 5,031 complaints, and Wait Time with 5,022 complaints. The empirical survey metrics indicate that the average ratings for these themes were 3.78, 3.68, and 3.74 respectively, while their corresponding customer satisfaction (CSAT) scores were 66.78, 62.93, and 60.95. Notably, Pricing also emerged as a significant concern, with 4,615 complaints, an average rating of 2.62, and a CSAT of 19.52, highlighting a critical area for operational focus. Cleanliness, while receiving 3,966 complaints, had a relatively higher average rating of 3.84 and a CSAT of 71.46.",
+    "supporting_metrics": {
+      "survey_metrics": {
+        "response_count": 38114,
+        "average_rating": 3.7,
+        "csat": 62.59,
+        "top_themes": [
+          {
+            "theme": "Pricing",
+            "count": 4615,
+            "average_rating": 2.62,
+            "csat": 19.52,
+            "negative_count": 2047
+          },
+          {
+            "theme": "Membership",
+            "count": 5031,
+            "average_rating": 3.68,
+            "csat": 62.93,
+            "negative_count": 855
+          },
+          {
+            "theme": "Facilities",
+            "count": 5683,
+            "average_rating": 3.78,
+            "csat": 66.78,
+            "negative_count": 793
+          },
+          {
+            "theme": "Wait Time",
+            "count": 5022,
+            "average_rating": 3.74,
+            "csat": 60.95,
+            "negative_count": 752
+          },
+          {
+            "theme": "Cleanliness",
+            "count": 3966,
+            "average_rating": 3.84,
+            "csat": 71.46,
+            "negative_count": 574
+          }
+        ]
+      }
+    },
+    "retrieved_sources": [],
+    "assumptions": [
+      "CSAT is defined deterministically as the percentage of survey ratings >= 4 out of 5."
+    ]
+  },
+  {
+    "category": "Paraphrase 2 (Longitudinal Delta)",
+    "question": "What was the difference in customer satisfaction ratings for wait times between April 2026 and May 2026?",
+    "tasks": [
+      {
+        "task_id": "task_1",
+        "agent": "ComparisonAgent",
+        "task_type": "period_comparison",
+        "question": "What was the difference in customer satisfaction ratings for wait times?",
+        "metric": "csat",
+        "dimensions": [],
+        "filters": {
+          "theme": "Wait Time},"
+        },
+        "date_range": {
+          "start_date": "2026-05-01",
+          "end_date": "2026-05-31"
+        },
+        "comparison_period": {
+          "start_date": "2026-04-01",
+          "end_date": "2026-04-30"
+        },
+        "retrieval_query": null,
+        "requested_limit": 5,
+        "rationale": "To compare customer satisfaction ratings for wait times between the two specified months.",
+        "start_date": "2026-05-01",
+        "end_date": "2026-05-31",
+        "comparison_start_date": "2026-04-01",
+        "comparison_end_date": "2026-04-30",
+        "parameters": {
+          "theme": "Wait Time},",
+          "metric": "csat",
+          "metric_name": "csat",
+          "top_n": 5,
+          "current_label": "May 2026",
+          "previous_label": "April 2026"
+        },
+        "instruction": null
+      }
+    ],
+    "answer": "Between April 2026 and May 2026, there was a significant improvement in customer satisfaction ratings regarding wait times. In April 2026, the measured customer satisfaction (CSAT) was 12.51, with an average rating of 2.13 based on 4,988 responses. In contrast, May 2026 saw a CSAT of 60.95 and an average rating of 3.74 from 5,022 responses. This reflects a CSAT increase of 48.44 points and an average rating increase of 1.61 points, indicating a substantial enhancement in customer perceptions of wait times during this period. No additional operational context or policy changes were provided to explain these shifts, and there are no FAQ sources available to further clarify this improvement.",
+    "supporting_metrics": {
+      "comparison": {
+        "current_period": {
+          "label": "May 2026",
+          "count": 5022,
+          "average_rating": 3.74,
+          "csat": 60.95
+        },
+        "previous_period": {
+          "label": "April 2026",
+          "count": 4988,
+          "average_rating": 2.13,
+          "csat": 12.51
+        },
+        "metric_changes": {
+          "csat_delta": 48.44,
+          "csat_pct_change": 387.21,
+          "average_rating_delta": 1.61,
+          "average_rating_pct_change": 75.59,
+          "count_delta": 34.0,
+          "count_pct_change": 0.68
+        }
+      }
+    },
+    "retrieved_sources": [],
+    "assumptions": [
+      "CSAT is defined deterministically as the percentage of survey ratings >= 4 out of 5.",
+      "Evaluated comparison periods / cohorts represent distinct groups."
+    ]
+  },
+  {
+    "category": "Paraphrase 3 (Hybrid Policy & Analytics)",
+    "question": "How long should customers anticipate waiting for their orders according to policy, and how did recent pickup satisfaction perform?",
+    "tasks": [
+      {
+        "task_id": "task_1",
+        "agent": "RAGAgent",
+        "task_type": "rag_lookup",
+        "question": "What is the expected wait time for customer orders according to policy?",
+        "metric": null,
+        "dimensions": [],
+        "filters": {},
+        "date_range": null,
+        "comparison_period": null,
+        "retrieval_query": "expected wait time for orders according to policy",
+        "requested_limit": 5,
+        "rationale": "To retrieve the official company policy on expected wait times.",
+        "start_date": null,
+        "end_date": null,
+        "comparison_start_date": null,
+        "comparison_end_date": null,
+        "parameters": {
+          "top_n": 5,
+          "query": "expected wait time for orders according to policy",
+          "top_k": 5
+        },
+        "instruction": null
+      },
+      {
+        "task_id": "task_2",
+        "agent": "DataAgent",
+        "task_type": "data_analysis",
+        "question": "What is the recent pickup satisfaction performance?",
+        "metric": "csat",
+        "dimensions": [],
+        "filters": {
+          "theme": "Pickup Satisfaction"
+        },
+        "date_range": {
+          "start_date": "2026-05-01",
+          "end_date": "2026-05-31"
+        },
+        "comparison_period": null,
+        "retrieval_query": null,
+        "requested_limit": 5,
+        "rationale": "To analyze the recent customer satisfaction metrics related to pickup experiences.",
+        "start_date": "2026-05-01",
+        "end_date": "2026-05-31",
+        "comparison_start_date": null,
+        "comparison_end_date": null,
+        "parameters": {
+          "theme": "Pickup Satisfaction",
+          "metric": "csat",
+          "metric_name": "csat",
+          "top_n": 5,
+          "current_label": "this month"
+        },
+        "instruction": null
+      }
+    ],
+    "answer": "Customers should anticipate wait times of under 10 minutes for counter orders during off-peak hours, while peak hours may extend this to 15-20 minutes due to increased kitchen order volume. Recent survey data indicates that customer satisfaction with pickup experiences is reflected in a CSAT score of 60.95 and an average rating of 3.74, based on 5,022 responses. Notably, the theme of wait time was highlighted, with 752 negative mentions, suggesting that while operational standards aim to minimize wait times, there are areas for improvement in customer perceptions of their experiences.",
+    "supporting_metrics": {
+      "survey_metrics": {
+        "response_count": 5022,
+        "average_rating": 3.74,
+        "csat": 60.95,
+        "top_themes": [
+          {
+            "theme": "Wait Time",
+            "count": 5022,
+            "average_rating": 3.74,
+            "csat": 60.95,
+            "negative_count": 752
+          }
+        ]
+      }
+    },
+    "retrieved_sources": [
+      "faq_chunk_2: ## Q2: What is your average wait time?\nWe target under 10 minutes for counter orders during off-peak hours. Peak hours (12:00 PM\u20131:00 PM lunch and 6:00 PM\u20138:00 PM dinner) may see 15\u201320 minute waits due to high kitchen order volume. Beginning May 1st, dedicated express pickup stations were introduced across all bistro locations to separate advance mobile orders from walk-in registers. Guests ordering through our mobile app receive real-time kitchen tracking notifications with estimated preparation windows to help minimize in-store waiting.",
+      "faq_chunk_3: ## Q3: How do you handle complaints?\nAll complaints are escalated to the shift manager within 15 minutes. Refunds or replacements are offered for quality issues. If an order takes longer than 20 minutes due to unexpected kitchen bottlenecks, supervisors are empowered to issue immediate complimentary beverage vouchers or GreenLeaf loyalty points. We conduct daily shift debriefs to review all guest feedback submitted via digital receipts or counter cards, ensuring operational issues are resolved swiftly."
+    ],
     "assumptions": [
       "CSAT is defined deterministically as the percentage of survey ratings >= 4 out of 5."
     ]
