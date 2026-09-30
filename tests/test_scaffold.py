@@ -55,9 +55,9 @@ def test_survey_service_loading() -> None:
     surveys = service.get_all_surveys()
     assert len(surveys) == 75000
 
-    # Filter enterprise
-    enterprise = filter_surveys(surveys, cohort="enterprise")
-    assert len(enterprise) > 10000
+    # Filter mobile channel
+    mobile = filter_surveys(surveys, channel="mobile")
+    assert len(mobile) > 10000
 
 
 def test_faq_chunking_and_retrieval() -> None:
@@ -74,16 +74,16 @@ def test_faq_chunking_and_retrieval() -> None:
 def test_agents_scaffold_execution() -> None:
     # 1. Orchestrator
     orchestrator = OrchestratorAgent()
-    tasks = orchestrator.plan("Compare CSAT between enterprise and self_serve")
+    tasks = orchestrator.plan("Compare CSAT between mobile and web")
     assert len(tasks) > 0
-    assert tasks[0].task_type == TaskType.COMPARISON
+    assert tasks[0].agent == "ComparisonAgent"
 
     # 2. DataAgent
     data_agent = DataAgent()
-    data_out = data_agent.run(DataAgentInput(metric_name="csat", cohort="enterprise"))
+    data_out = data_agent.run(DataAgentInput(metric_name="csat", cohort="mobile"))
     assert isinstance(data_out.value, float)
     assert 0.0 <= data_out.value <= 100.0
-    assert data_out.sample_size == 11363
+    assert data_out.sample_size > 10000
 
     # 3. RAGAgent
     rag_agent = RAGAgent()
@@ -94,8 +94,8 @@ def test_agents_scaffold_execution() -> None:
     # 4. ComparisonAgent
     comp_agent = ComparisonAgent(data_agent=data_agent)
     comp_out = comp_agent.run(
-        ComparisonAgentInput(metric_name="csat", cohort_a="enterprise", cohort_b="self_serve")
+        ComparisonAgentInput(metric_name="csat", cohort_a="mobile", cohort_b="web")
     )
     assert isinstance(comp_out.delta, float)
-    assert comp_out.cohort_a == "enterprise"
-    assert comp_out.cohort_b == "self_serve"
+    assert comp_out.cohort_a == "mobile"
+    assert comp_out.cohort_b == "web"

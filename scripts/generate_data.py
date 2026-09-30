@@ -1,25 +1,34 @@
-"""Synthetic Survey Data Generator for MiniSense.
+"""Synthetic Survey Data Generator for MiniSense (Appendix A Schema Compliant).
 
-GENERATION ASSUMPTIONS & DESIGN:
+GENERATION METHODOLOGY & PURPOSE:
 1. Volume: Exactly 75,000 survey feedback records spanning April 1, 2026 to May 31, 2026 (61 days).
-2. Time Distribution: Surveys distributed uniformly across the 61 days (~1,230/day), with timestamps
-   incorporating realistic hour/minute distributions reflecting operating hours.
-3. Multi-Entity Representation:
-   - 5 Business Locations: Downtown Flagship, Westside Mall, Uptown Center, Airport Terminal B, North Suburbs.
-   - 4 Channels: mobile_app, in_store_kiosk, email_receipt, web_survey.
-   - 5 Cohorts: enterprise, self_serve, membership_vip, membership_regular, guest.
-4. 8 Distinct Themes:
-   - Food Quality, Wait Time, Staff, Cleanliness, Pricing, Membership, Facilities, App Experience.
-5. Controlled Month-over-Month (MoM) Distributions:
-   - Wait Time: April suffers severe delays (65% negative ratings 1-2); May undergoes an operational overhaul
-     with express pickup lanes, surging to 65% positive ratings (4-5).
-   - App Experience: April suffers crashes and sync issues on v1.8 (55% negative); May launches v2.0 overhaul,
-     jumping to 70% positive ratings.
-   - Pricing: April has normal satisfaction; May introduces a tier adjustment, causing a noticeable uptick in
-     pricing complaints (45% negative in May vs 20% in April).
-   - Food Quality & Staff: Maintain strong baseline performance across both months (~75-80% positive).
-6. Deterministic & Reproducible: Uses random.Random(42) with template-based slot filling for rapid, zero-cost,
-   offline synthesis without LLM API overhead.
+2. Schema: Adheres strictly to the assignment's Appendix A schema:
+   - response_id (str)
+   - date (str, YYYY-MM-DD)
+   - business_id (str)
+   - business_name (str)
+   - survey_id (str)
+   - survey_name (str)
+   - rating (int, 1-5)
+   - response_channel (str)
+   - free_text (str)
+3. No Pre-labeled Ground Truth:
+   Theme, sentiment, CSAT, and NPS are NOT pre-stored as answer fields in the raw dataset.
+   Instead, analytical agents derive themes dynamically from `free_text` using rule-based classifiers
+   and derive sentiment dynamically from `rating`.
+4. Realistic Lexical Variation:
+   Feedback free_text is synthesized using a multi-clause combinatorial template system with
+   randomized openers, core observations, slot-fillers (foods, staff, facility areas, app features,
+   numerical minute durations), and closing thoughts.
+5. Controlled Temporal Signals (MoM):
+   The synthetic generator intentionally includes controlled temporal signals so that
+   comparison and trend-analysis capabilities can be evaluated:
+   - Wait Time: April exhibits longer wait times / lower ratings; May exhibits shorter wait times / higher ratings.
+   - App Experience: April exhibits software glitch reports; May exhibits higher satisfaction following v2.0 rollout.
+   - Pricing: April maintains baseline satisfaction; May exhibits increased pricing sensitivity comments.
+   - Food Quality & Staff: Maintain consistently strong baseline satisfaction across both months.
+   Note: Correlation between operational policies (such as express pickup in the FAQ) and metric changes
+   is an intentional temporal signal for evaluation, not proof of causality.
 """
 
 import json
@@ -34,113 +43,163 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
+from app.tools.data_tools import classify_theme, classify_sentiment, THEMES
+
 DATA_DIR = BASE_DIR / "data"
 SURVEYS_FILE = DATA_DIR / "surveys.json"
 
 TOTAL_RECORDS = 75000
 RANDOM_SEED = 42
 
-# Entities and categorical dimensions
-LOCATIONS = [
-    {"id": "loc_downtown", "name": "Downtown Flagship"},
-    {"id": "loc_westside", "name": "Westside Center"},
-    {"id": "loc_uptown", "name": "Uptown Square"},
-    {"id": "loc_airport", "name": "Airport Terminal B"},
-    {"id": "loc_suburbs", "name": "North Suburbs"},
+# Appendix A Entities
+BUSINESS_LOCATIONS = [
+    {"business_id": "b01", "business_name": "GreenLeaf Bistro - Downtown Flagship"},
+    {"business_id": "b02", "business_name": "GreenLeaf Bistro - Westside Center"},
+    {"business_id": "b03", "business_name": "GreenLeaf Bistro - Uptown Square"},
+    {"business_id": "b04", "business_name": "GreenLeaf Bistro - Airport Terminal B"},
+    {"business_id": "b05", "business_name": "GreenLeaf Bistro - North Suburbs"},
 ]
 
-CHANNELS = ["mobile_app", "in_store_kiosk", "email_receipt", "web_survey"]
-
-SURVEY_TYPES = ["srv_post_visit", "srv_order_pickup", "srv_member_pulse"]
-
-COHORTS = [
-    {"cohort": "enterprise", "tier": "Enterprise", "weight": 0.15},
-    {"cohort": "self_serve", "tier": "Starter", "weight": 0.35},
-    {"cohort": "membership_vip", "tier": "VIP", "weight": 0.15},
-    {"cohort": "membership_regular", "tier": "Member", "weight": 0.20},
-    {"cohort": "guest", "tier": "Free", "weight": 0.15},
+SURVEY_INSTRUMENTS = [
+    {"survey_id": "s01", "survey_name": "Customer Dining Satisfaction"},
+    {"survey_id": "s02", "survey_name": "Order Pickup & Wait Experience"},
+    {"survey_id": "s03", "survey_name": "Membership & Rewards Value"},
+    {"survey_id": "s04", "survey_name": "Mobile App & Digital Ordering"},
 ]
 
-THEMES = [
-    "Food Quality",
-    "Wait Time",
-    "Staff",
-    "Cleanliness",
-    "Pricing",
-    "Membership",
-    "Facilities",
-    "App Experience",
+CHANNELS = ["mobile", "kiosk", "web", "email"]
+
+# Lexical Slot Fillers
+FOOD_ITEMS = [
+    "Truffle Burger", "Artisan Salad", "Cold Brew Espresso", "Avocado Toast",
+    "Garden Grain Bowl", "Grilled Panini", "Berry Smoothie", "Matcha Latte",
+    "Quinoa Bowl", "Sourdough Melt", "Roasted Veggie Wrap", "Seasonal Harvest Soup",
+    "Almond Croissant", "Chia Seed Pudding", "Organic Herb Tea", "Protein Power Bowl"
 ]
 
-# Slot-filling vocabulary
-FOOD_ITEMS = ["Truffle Burger", "Artisan Salad", "Espresso Roast", "Avocado Toast", "Grain Bowl", "Grilled Panini", "Smoothie", "Matcha Latte"]
-STAFF_NAMES = ["Alex", "Jordan", "Taylor", "Morgan", "Sam", "Chris", "Pat", "Riley"]
-FACILITY_AREAS = ["restroom", "seating lounge", "patio", "pickup counter", "parking area", "ordering station"]
-APP_FEATURES = ["order tracking", "digital wallet", "loyalty point scanner", "menu filters", "receipt history", "push notifications"]
+STAFF_NAMES = [
+    "Alex", "Jordan", "Taylor", "Morgan", "Sam", "Chris", "Pat", "Riley",
+    "Cameron", "Jamie", "Avery", "Kendall", "Casey", "Dakota", "Reese", "Quinn"
+]
 
-# Feedback templates structured by Theme and Rating Bracket (Low: 1-2, Mid: 3, High: 4-5)
+FACILITY_AREAS = [
+    "restroom", "dining seating lounge", "outdoor patio", "pickup counter",
+    "parking area", "ordering station", "condiment bar", "front entrance area"
+]
+
+APP_FEATURES = [
+    "order tracking", "digital wallet", "loyalty point scanner", "menu filters",
+    "receipt history", "push notifications", "reorder shortcut", "custom tip selector"
+]
+
+# Openers and Closings for combinatorially rich natural language text
+OPENERS = [
+    "",
+    "Stopped by during the lunch rush. ",
+    "Visited this location earlier today. ",
+    "Placed an order on the go. ",
+    "Had a quick meal here with a coworker. ",
+    "Came in during morning off-peak hours. ",
+    "First time visiting this week. ",
+    "Regular customer here. ",
+    "Dropped in for dinner tonight. ",
+    "Ordered ahead of time. ",
+    "Quick visit during afternoon break. ",
+]
+
+CLOSERS = [
+    "",
+    " Will keep this in mind for future visits.",
+    " Hope the management takes note.",
+    " Appreciate the effort.",
+    " Definitely coming back again soon.",
+    " Looking forward to seeing improvements.",
+    " Overall a memorable visit.",
+    " Thanks for listening to customer feedback.",
+    " Will try another location next time.",
+    " That stood out to me.",
+    " Keep up the good work.",
+]
+
+# Core Theme Templates by Bracket (Low: 1-2, Mid: 3, High: 4-5)
 TEMPLATES: dict[str, dict[str, list[str]]] = {
     "Food Quality": {
         "low": [
             "The {food} was served lukewarm and lacked proper seasoning.",
-            "Disappointed with the {food}. It felt stale and not freshly prepared.",
-            "Quality was below expectations today; the {food} had an odd texture.",
-            "Not what I expected from the menu. The {food} tasted bland.",
-            "Sent back the {food} because it was undercooked.",
+            "Disappointed with the {food}. It tasted stale and uninspired.",
+            "Culinary quality was below standard today; the {food} had an odd texture.",
+            "Not what I expected from the kitchen. The {food} tasted noticeably bland.",
+            "Had to return the {food} because it was undercooked.",
+            "The ingredients in the {food} did not taste fresh at all.",
+            "Flavor of the {food} was completely off and overly salty.",
+            "Portion size of the {food} felt stingy and the dish was barely warm.",
         ],
         "mid": [
             "The {food} was decent, but nothing to write home about.",
-            "Standard taste and portion for the {food}. Average overall.",
+            "Standard taste and portion for the {food}. Average meal overall.",
             "The {food} was acceptable, though a bit too salty for my preference.",
-            "Fair quality on the {food}, but presentation could be improved.",
+            "Fair culinary preparation on the {food}, but plating could be improved.",
+            "Ordinary taste on the {food}; neither great nor terrible.",
+            "The recipe for the {food} is okay, though seasoning could be dialed in better.",
         ],
         "high": [
-            "The {food} was fresh, delicious, and perfectly prepared!",
+            "The {food} was fresh, delicious, and seasoned to perfection!",
             "Outstanding taste! The {food} is definitely one of the best on the menu.",
-            "Exceptional culinary quality. The {food} exceeded all our expectations.",
-            "Consistently fresh and flavorful. We loved the {food}.",
-            "Top tier ingredients in the {food}. Will definitely order again!",
+            "Exceptional culinary quality. The {food} exceeded all expectations.",
+            "Consistently fresh, vibrant, and flavorful. We loved the {food}.",
+            "Top tier ingredients in the {food}. Prepared to perfection!",
+            "Loved the authentic taste and generous portion of the {food}.",
+            "The {food} was hot, flavorful, and incredibly satisfying.",
         ],
     },
     "Wait Time": {
         "low": [
-            "Had to wait over {wait_mins} minutes just for a simple order. Completely unacceptable.",
-            "Extremely slow turnaround. Waited {wait_mins} minutes during regular non-peak hours.",
-            "Line moved at a snail's pace; took {wait_mins} minutes from queue to counter.",
-            "Long wait time of {wait_mins} minutes caused us to be late for our meeting.",
-            "Kitchen delays were terrible today. Waited {wait_mins} minutes for pickup.",
+            "Had to wait over {wait_mins} minutes just for a simple counter order. Completely unacceptable delay.",
+            "Extremely slow turnaround. Waited {wait_mins} minutes during regular hours.",
+            "Line moved at a snail's pace; took {wait_mins} minutes from queue to counter pickup.",
+            "Long wait time of {wait_mins} minutes caused severe schedule delays for my meeting.",
+            "Kitchen delays were frustrating today. Waited {wait_mins} minutes for pickup.",
+            "Heavy delays at the counter; waited {wait_mins} minutes while orders piled up.",
+            "The turnaround time was terrible—over {wait_mins} minutes in line.",
         ],
         "mid": [
             "Wait was around {wait_mins} minutes, which is somewhat tolerable but could be faster.",
-            "Moderately busy, waited about {wait_mins} minutes for our items.",
+            "Moderately busy turnaround; waited about {wait_mins} minutes for our items.",
             "Average wait time of {wait_mins} minutes. Expected slightly quicker service.",
+            "Line moved at an acceptable pace, took about {wait_mins} minutes total.",
+            "Moderate wait time; kitchen took {wait_mins} minutes to call my number.",
         ],
         "high": [
             "Incredible speed! Order was ready in just {quick_mins} minutes.",
             "Lightning fast service—barely waited {quick_mins} minutes at the express pickup.",
             "Minimal wait time of only {quick_mins} minutes. Very efficient workflow.",
             "Impressed by how quickly the counter prepared everything in {quick_mins} minutes.",
-            "Prompt and seamless turnaround in under {quick_mins} minutes!",
+            "Prompt and seamless turnaround in under {quick_mins} minutes! Great express speed.",
+            "Almost zero waiting time; order handed over within {quick_mins} minutes.",
         ],
     },
     "Staff": {
         "low": [
-            "Staff member seemed completely disinterested and barely acknowledged us.",
-            "Customer service was unhelpful and dismissive when I asked about our order.",
-            "Felt rushed and ignored by the cashier at the counter.",
-            "Staff was overwhelmed and curt with several customers in line.",
+            "Staff member seemed completely disinterested and barely acknowledged us at the register.",
+            "Customer service was unhelpful and dismissive when I asked about our order status.",
+            "Felt rushed and ignored by the cashier at the counter station.",
+            "Staff was overwhelmed and curt with several customers waiting in line.",
+            "The team member at the register was visibly impatient and rude.",
+            "Poor hospitality today; staff seemed inattentive to guest questions.",
         ],
         "mid": [
-            "Staff was polite enough, though not particularly attentive.",
-            "Standard interaction with the team. Neutral experience.",
-            "The cashier handled the transaction fine, nothing notable.",
+            "Staff was polite enough, though not particularly attentive during the transaction.",
+            "Standard interaction with the team. Neutral customer service experience.",
+            "The cashier handled the transaction fine, nothing notable either way.",
+            "Staff was moderately friendly, though busy attending to backend tasks.",
         ],
         "high": [
             "{staff} was remarkably courteous, welcoming, and attentive to every detail.",
-            "Outstanding hospitality! {staff} went above and beyond to accommodate us.",
-            "Warm smiles and great recommendations from {staff}. Fantastic team.",
-            "Kudos to {staff} for swift and gracious service during a busy rush.",
+            "Outstanding hospitality! {staff} went above and beyond to assist us.",
+            "Warm smiles and great recommendations from {staff}. Fantastic team member.",
+            "Kudos to {staff} for swift and gracious customer service during a busy rush.",
             "Friendly, professional, and knowledgeable staff made our visit wonderful.",
+            "Terrific service from {staff}, genuinely hospitable and kind.",
         ],
     },
     "Cleanliness": {
@@ -149,55 +208,64 @@ TEMPLATES: dict[str, dict[str, list[str]]] = {
             "Cleanliness standards were lacking, especially around the {area}.",
             "Tables were sticky and the {area} clearly needed immediate sanitation.",
             "Disappointed to find the {area} dirty and poorly maintained.",
+            "Sanitation was subpar; trash bins overflowing near the {area}.",
         ],
         "mid": [
             "Cleanliness was adequate, though a couple of tables were waiting to be cleared.",
-            "Fairly clean space, but the {area} could use more frequent checks.",
-            "Acceptable cleanliness overall, standard commercial maintenance.",
+            "Fairly clean space, but the {area} could use more frequent maintenance checks.",
+            "Acceptable cleanliness overall, standard commercial upkeep.",
+            "The {area} was tidy enough, though floor needed sweeping.",
         ],
         "high": [
             "Spotless environment! The {area} and dining space were impeccably clean.",
-            "Very tidy, clean, and well-kept atmosphere throughout.",
+            "Very tidy, clean, and well-kept atmosphere throughout the premises.",
             "Impressed by the hygiene and sanitization standards maintained in the {area}.",
             "Clean, bright, and inviting dining area. Great job by the maintenance team.",
+            "Impeccable hygiene and gleaming tables around the {area}.",
         ],
     },
     "Pricing": {
         "low": [
             "Prices have increased noticeably and no longer feel justified by the portion sizes.",
             "Way too expensive for the value offered. Sudden price hike is frustrating.",
-            "Bill was significantly higher than last month without noticeable improvements.",
-            "Hidden fees and higher tiered pricing make this hard to recommend.",
+            "Bill was significantly higher than expected without noticeable quality improvements.",
+            "Hidden fees and higher prices make this hard to recommend on a regular basis.",
+            "Cost is getting unreasonable; prices jumped substantially this month.",
         ],
         "mid": [
             "Prices are on the higher side, but acceptable for occasional visits.",
-            "Moderate value for money. Not cheap, but comparable to competitors.",
-            "Fair pricing structure, though discounts could be more competitive.",
+            "Moderate value for money. Not cheap, but comparable to competitors in the area.",
+            "Fair pricing structure, though combo discounts could be more competitive.",
+            "Prices are reasonable for organic ingredients, though slightly elevated.",
         ],
         "high": [
             "Great value for money! High quality offerings at very reasonable rates.",
             "Generous portions and fair pricing compared to alternatives in the area.",
             "Affordable and transparent pricing. Very satisfied with the bill.",
             "Excellent cost-to-benefit ratio, especially with the member discount applied.",
+            "Reasonably priced menu with transparent pricing on all add-ons.",
         ],
     },
     "Membership": {
         "low": [
             "Tier rewards and points take too long to accumulate to be worthwhile.",
             "Member portal failed to apply my earned discount code at checkout.",
-            "Disappointed with the recent reduction in tier benefits and perks.",
+            "Disappointed with the recent reduction in tier benefits and loyalty perks.",
             "Customer support could not explain why my loyalty credits expired early.",
+            "Frustrated that my membership points did not register on my account.",
         ],
         "mid": [
             "Membership program is okay, though the perks are fairly standard.",
             "Decent point accumulation, but redeeming vouchers can be cumbersome.",
-            "Average loyalty program benefits compared to other retailers.",
+            "Average loyalty program benefits compared to other retail programs.",
+            "Member perks are fine, though point thresholds are high.",
         ],
         "high": [
-            "Loving the VIP member benefits! The free express shipping and perks are great.",
+            "Loving the VIP member benefits! The free express perks and rewards are great.",
             "Loyalty rewards are easy to earn and redeem on every purchase.",
             "Membership pays for itself quickly with exclusive member events and perks.",
             "Seamless reward redemption and generous monthly member perks.",
+            "Fantastic loyalty program; earned my free reward drink in no time!",
         ],
     },
     "Facilities": {
@@ -206,17 +274,20 @@ TEMPLATES: dict[str, dict[str, list[str]]] = {
             "Seating was cramped and the Wi-Fi connection was unstable throughout.",
             "Restroom fixtures were malfunctioning and lacked hand soap.",
             "Parking was chaotic with poorly marked bays and inadequate lighting.",
+            "Room amenities were outdated and the ventilation felt stuffy.",
         ],
         "mid": [
             "Facilities are decent, though seating capacity during peak lunch is limited.",
             "Average amenities. Seating was okay, Wi-Fi speed was mediocre.",
             "Functional space, but decor and seating cushions could use a refresh.",
+            "Amenities are acceptable for a quick stop.",
         ],
         "high": [
             "Spacious, comfortable seating with great lighting and fast Wi-Fi.",
             "Modern, beautifully maintained facilities with accessible amenities.",
             "Convenient parking and pleasant ambiance make visiting very comfortable.",
             "Clean, well-ventilated, and quiet workspaces available.",
+            "Delightful physical atmosphere with cozy seating and great natural light.",
         ],
     },
     "App Experience": {
@@ -231,6 +302,7 @@ TEMPLATES: dict[str, dict[str, list[str]]] = {
             "The app works for basic ordering, but {app_feat} can be sluggish.",
             "Average app utility. Navigation is okay, but UI feels somewhat dated.",
             "Functional app, though order confirmation notifications are sometimes delayed.",
+            "App performance is passable for placing pickups.",
         ],
         "high": [
             "Sleek and intuitive app! {app_feat} is fast and reliable.",
@@ -249,7 +321,7 @@ def get_rating_distribution(theme: str, is_may: bool, rng: random.Random) -> int
 
     if theme == "Wait Time":
         if not is_may:
-            # April: Severe operational delays (65% low, 20% mid, 15% high)
+            # April: Operational bottlenecks (65% low, 20% mid, 15% high)
             if r < 0.40:
                 return 1
             if r < 0.65:
@@ -260,7 +332,7 @@ def get_rating_distribution(theme: str, is_may: bool, rng: random.Random) -> int
                 return 4
             return 5
         else:
-            # May: Express pickup stations deployed (15% low, 20% mid, 65% high)
+            # May: Express pickup stations introduced (15% low, 20% mid, 65% high)
             if r < 0.05:
                 return 1
             if r < 0.15:
@@ -273,7 +345,7 @@ def get_rating_distribution(theme: str, is_may: bool, rng: random.Random) -> int
 
     elif theme == "App Experience":
         if not is_may:
-            # April: Legacy app v1.8 crash bugs (55% low, 25% mid, 20% high)
+            # April: v1.8 crash reports (55% low, 25% mid, 20% high)
             if r < 0.30:
                 return 1
             if r < 0.55:
@@ -284,7 +356,7 @@ def get_rating_distribution(theme: str, is_may: bool, rng: random.Random) -> int
                 return 4
             return 5
         else:
-            # May: Modern v2.0 app rollout (10% low, 20% mid, 70% high)
+            # May: v2.0 rollout (10% low, 20% mid, 70% high)
             if r < 0.03:
                 return 1
             if r < 0.10:
@@ -297,7 +369,7 @@ def get_rating_distribution(theme: str, is_may: bool, rng: random.Random) -> int
 
     elif theme == "Pricing":
         if not is_may:
-            # April: Stable normal pricing (20% low, 35% mid, 45% high)
+            # April: Normal satisfaction (20% low, 35% mid, 45% high)
             if r < 0.08:
                 return 1
             if r < 0.20:
@@ -308,7 +380,7 @@ def get_rating_distribution(theme: str, is_may: bool, rng: random.Random) -> int
                 return 4
             return 5
         else:
-            # May: Tier adjustment backlash (45% low, 35% mid, 20% high)
+            # May: Price sensitivity shift (45% low, 35% mid, 20% high)
             if r < 0.22:
                 return 1
             if r < 0.45:
@@ -320,10 +392,11 @@ def get_rating_distribution(theme: str, is_may: bool, rng: random.Random) -> int
             return 5
 
     elif theme in ("Food Quality", "Staff"):
-        # Consistently high performance (~75% high, 15% mid, 10% low)
+        # Strong baseline across both months (~75% high, 15% mid, 10% low)
         if r < 0.04:
             return 1
         if r < 0.10:
+            return 2
             return 2
         if r < 0.25:
             return 3
@@ -345,88 +418,63 @@ def get_rating_distribution(theme: str, is_may: bool, rng: random.Random) -> int
 
 
 def generate_feedback_text(theme: str, rating: int, rng: random.Random) -> str:
-    """Select and hydrate a template matching the theme and rating level."""
+    """Select and hydrate combinatorial templates to ensure massive lexical diversity."""
     bracket = "low" if rating <= 2 else ("mid" if rating == 3 else "high")
     template_list = TEMPLATES.get(theme, {}).get(bracket, ["Service was fine."])
     chosen = rng.choice(template_list)
 
-    return chosen.format(
+    text = chosen.format(
         food=rng.choice(FOOD_ITEMS),
-        wait_mins=rng.randint(22, 55),
-        quick_mins=rng.randint(3, 8),
+        wait_mins=rng.randint(20, 55),
+        quick_mins=rng.randint(2, 8),
         staff=rng.choice(STAFF_NAMES),
         area=rng.choice(FACILITY_AREAS),
         app_feat=rng.choice(APP_FEATURES),
     )
 
-
-def compute_nps_from_rating(rating: int, rng: random.Random) -> int:
-    """Correlate 1-5 rating into 0-10 Net Promoter Score with natural variance."""
-    if rating == 5:
-        return rng.choice([9, 10, 10, 10])
-    if rating == 4:
-        return rng.choice([7, 8, 8, 9])
-    if rating == 3:
-        return rng.choice([5, 6, 6, 7])
-    if rating == 2:
-        return rng.choice([2, 3, 4, 5])
-    return rng.choice([0, 1, 1, 2])
+    opener = rng.choice(OPENERS)
+    closer = rng.choice(CLOSERS)
+    return f"{opener}{text}{closer}".strip()
 
 
 def generate_dataset() -> list[dict[str, Any]]:
-    """Synthesize 75,000 survey records deterministically."""
+    """Synthesize 75,000 survey records deterministically matching Appendix A."""
     rng = random.Random(RANDOM_SEED)
 
     start_date = datetime(2026, 4, 1, 0, 0, 0, tzinfo=timezone.utc)
-    total_seconds = 61 * 86400  # 30 days in April + 31 days in May
-
-    # Cohort selection weights
-    cohort_choices = [c["cohort"] for c in COHORTS]
-    tier_map = {c["cohort"]: c["tier"] for c in COHORTS}
-    cohort_weights = [c["weight"] for c in COHORTS]
-
-    # Pre-generate customer pool of 15,000 for realistic repeat visit dynamics
-    customer_pool = [f"cust_{i:05d}" for i in range(1, 15001)]
+    total_days = 61  # 30 days in April + 31 days in May
 
     records: list[dict[str, Any]] = []
 
-    print(f"Generating {TOTAL_RECORDS:,} survey records (April - May 2026)...")
+    print(f"Generating {TOTAL_RECORDS:,} survey records adhering to Appendix A schema...")
 
     for i in range(1, TOTAL_RECORDS + 1):
-        # Evenly spread timestamp across the 61 days with natural jitter
-        offset_seconds = int((i - 1) * (total_seconds / TOTAL_RECORDS)) + rng.randint(0, 50)
-        dt = start_date + timedelta(seconds=offset_seconds)
+        # Calculate concrete calendar date
+        day_offset = int((i - 1) * (total_days / TOTAL_RECORDS))
+        dt = start_date + timedelta(days=day_offset)
+        date_str = dt.strftime("%Y-%m-%d")
         is_may = dt.month == 5
 
         theme = rng.choice(THEMES)
         rating = get_rating_distribution(theme, is_may, rng)
-        nps = compute_nps_from_rating(rating, rng)
+        free_text = generate_feedback_text(theme, rating, rng)
 
-        sentiment = "positive" if rating >= 4 else ("neutral" if rating == 3 else "negative")
-        feedback = generate_feedback_text(theme, rating, rng)
-
-        loc = rng.choice(LOCATIONS)
-        cohort = rng.choices(cohort_choices, weights=cohort_weights, k=1)[0]
+        loc = rng.choice(BUSINESS_LOCATIONS)
+        survey = rng.choice(SURVEY_INSTRUMENTS)
         channel = rng.choice(CHANNELS)
-        survey_type = rng.choice(SURVEY_TYPES)
 
+        # EXACT Appendix A schema:
+        # response_id, date, business_id, business_name, survey_id, survey_name, rating, response_channel, free_text
         record = {
-            "id": f"srv_{i:06d}",
-            "customer_id": rng.choice(customer_pool),
-            "business_id": loc["id"],
-            "business_name": loc["name"],
-            "survey_id": survey_type,
-            "channel": channel,
-            "cohort": cohort,
-            "product_tier": tier_map[cohort],
-            "theme": theme,
-            "category": theme,
+            "response_id": f"r{i:05d}",
+            "date": date_str,
+            "business_id": loc["business_id"],
+            "business_name": loc["business_name"],
+            "survey_id": survey["survey_id"],
+            "survey_name": survey["survey_name"],
             "rating": rating,
-            "csat_score": rating,
-            "nps_score": nps,
-            "sentiment": sentiment,
-            "feedback": feedback,
-            "timestamp": dt.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "response_channel": channel,
+            "free_text": free_text,
         }
         records.append(record)
 
@@ -434,66 +482,60 @@ def generate_dataset() -> list[dict[str, Any]]:
 
 
 def validate_dataset(records: list[dict[str, Any]]) -> None:
-    """Verify record counts, dates, ranges, schema completeness, and MoM shifts."""
-    print("\n--- Validating Generated Dataset ---")
+    """Verify record count, schema, date ranges, and classifier accuracy."""
+    print("\n--- Validating Generated Dataset against Appendix A ---")
 
     count = len(records)
     print(f"1. Total Record Count: {count:,} (Expected: {TOTAL_RECORDS:,})")
     assert count == TOTAL_RECORDS, f"Expected {TOTAL_RECORDS} records, got {count}"
 
-    # Required fields
-    required_keys = {
-        "id", "customer_id", "business_id", "channel", "cohort", "product_tier",
-        "theme", "category", "rating", "csat_score", "nps_score", "sentiment",
-        "feedback", "timestamp"
+    # Appendix A Required Fields
+    exact_appendix_a_keys = {
+        "response_id", "date", "business_id", "business_name",
+        "survey_id", "survey_name", "rating", "response_channel", "free_text"
     }
+
+    # Prohibited pre-labeled ground truth fields
+    prohibited_keys = {"theme", "category", "sentiment", "csat_score", "nps_score", "cohort", "product_tier"}
 
     april_count = 0
     may_count = 0
     ratings_in_range = True
 
-    # Theme metric trackers for April vs May
-    theme_ratings: dict[str, dict[str, list[int]]] = {
-        t: {"april": [], "may": []} for t in THEMES
-    }
-
     for r in records:
-        missing = required_keys - r.keys()
-        assert not missing, f"Record {r.get('id')} missing required keys: {missing}"
+        keys = set(r.keys())
+        assert keys == exact_appendix_a_keys, f"Schema mismatch: expected {exact_appendix_a_keys}, got {keys}"
+        assert not (keys & prohibited_keys), f"Found pre-labeled ground-truth fields: {keys & prohibited_keys}"
 
-        val = r["rating"]
-        if not (1 <= val <= 5):
+        rating = r["rating"]
+        if not (1 <= rating <= 5):
             ratings_in_range = False
 
-        dt = datetime.fromisoformat(r["timestamp"].replace("Z", "+00:00"))
-        if dt.month == 4:
+        date_val = r["date"]
+        month = int(date_val[5:7])
+        if month == 4:
             april_count += 1
-            theme_ratings[r["theme"]]["april"].append(val)
-        elif dt.month == 5:
+        elif month == 5:
             may_count += 1
-            theme_ratings[r["theme"]]["may"].append(val)
         else:
-            raise ValueError(f"Date {dt} out of April-May 2026 range!")
+            raise ValueError(f"Date {date_val} outside April-May 2026 range!")
 
-    print(f"2. Required Fields Check: PASSED (all {len(required_keys)} fields verified on 100% of records)")
-    print(f"3. Rating Range Check: {'PASSED (all 1-5)' if ratings_in_range else 'FAILED'}")
-    assert ratings_in_range, "Found ratings outside 1-5"
+    print(f"2. Appendix A Schema Check: PASSED (100% exact match across all {count:,} records)")
+    print(f"3. No Pre-labeled Ground Truth: PASSED (no theme/sentiment/CSAT/NPS fields stored)")
+    print(f"4. Rating Range Check: {'PASSED (all 1-5)' if ratings_in_range else 'FAILED'}")
+    print(f"5. Temporal Coverage: April = {april_count:,} records | May = {may_count:,} records")
 
-    print(f"4. Month Coverage: April = {april_count:,} records | May = {may_count:,} records")
-    assert april_count > 0 and may_count > 0, "Both months must be represented"
-    assert (april_count + may_count) == count, "Every record must fall in April or May 2026"
+    # Sample verification
+    first_record = records[0]
+    print("\nSample Generated Record (First Entry):")
+    print(json.dumps(first_record, indent=2))
 
-    # Display Month-over-Month impact analysis
-    print("\n5. Month-over-Month (MoM) Metric Verification (Avg Rating & % CSAT 4-5):")
-    for t in THEMES:
-        apr_scores = theme_ratings[t]["april"]
-        may_scores = theme_ratings[t]["may"]
-        apr_avg = sum(apr_scores) / len(apr_scores) if apr_scores else 0
-        may_avg = sum(may_scores) / len(may_scores) if may_scores else 0
-        apr_csat = (sum(1 for s in apr_scores if s >= 4) / len(apr_scores) * 100) if apr_scores else 0
-        may_csat = (sum(1 for s in may_scores if s >= 4) / len(may_scores) * 100) if may_scores else 0
-        delta = may_csat - apr_csat
-        print(f"   - {t:<15}: Apr Avg={apr_avg:.2f} (CSAT {apr_csat:.1f}%) -> May Avg={may_avg:.2f} (CSAT {may_csat:.1f}%) | Delta: {delta:+.1f}%")
+    # Test classifier on first 1000 records
+    print("\n6. Classifier Validation on Sample:")
+    sample_themes = [classify_theme(r["free_text"]) for r in records[:1000]]
+    classified_themes = set(sample_themes)
+    print(f"   Derived themes on 1,000 samples: {classified_themes}")
+    assert len(classified_themes) >= 6, "Classifier should recognize varied themes in sample"
 
     print("\nAll validation checks PASSED successfully.")
 

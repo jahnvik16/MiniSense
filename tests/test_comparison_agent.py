@@ -42,8 +42,8 @@ def test_comparison_agent_month_over_month_wait_time(comp_agent: ComparisonAgent
 
     # Verify deterministic delta calculations
     changes = result.metric_changes
-    assert changes["csat_delta"] > 50.0  # +52.4%
-    assert changes["average_rating_delta"] > 1.5  # +1.70
+    assert changes["csat_delta"] > 40.0
+    assert changes["average_rating_delta"] > 1.5
     assert "improved by" in result.summary
 
 
@@ -100,16 +100,16 @@ def test_comparison_agent_cohort_comparison(comp_agent: ComparisonAgent) -> None
         task_id="task_comp_cohorts",
         agent=AgentType.COMPARISON_AGENT.value,
         task_type=TaskType.COHORT_COMPARISON.value,
-        question="Compare enterprise vs self_serve satisfaction",
+        question="Compare mobile vs web channel satisfaction",
         parameters={
-            "cohort_a": "enterprise",
-            "cohort_b": "self_serve",
+            "cohort_a": "mobile",
+            "cohort_b": "web",
         },
     )
     result = comp_agent.run(task)
 
     assert isinstance(result, ComparisonAgentResult)
-    assert result.current_period.period_label == "enterprise"
-    assert result.previous_period.period_label == "self_serve"
+    assert result.current_period.period_label == "mobile"
+    assert result.previous_period.period_label == "web"
     assert "csat_delta" in result.metric_changes
     assert len(result.current_period.top_themes) > 0

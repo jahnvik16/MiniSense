@@ -26,8 +26,8 @@ class RAGAgent:
     def run(self, task_or_input: TaskSpec | RAGAgentInput) -> RAGAgentResult:
         """Process structured retrieval task and return validated RAGAgentResult."""
         if isinstance(task_or_input, TaskSpec):
-            query = task_or_input.parameters.get("query") or task_or_input.question
-            top_k = int(task_or_input.parameters.get("top_k", 3))
+            query = task_or_input.retrieval_query or task_or_input.parameters.get("query") or task_or_input.question
+            top_k = int(task_or_input.requested_limit or task_or_input.parameters.get("top_k", 3))
             threshold = float(task_or_input.parameters.get("min_confidence", self.min_confidence))
         else:
             query = task_or_input.query

@@ -10,6 +10,7 @@ from app.models.schemas import (
 )
 from app.services.survey_service import SurveyService
 from app.tools.data_tools import (
+    classify_theme,
     compare_period_metrics,
     compute_average_rating,
     compute_csat,
@@ -120,12 +121,25 @@ class ComparisonAgent:
         """Compare performance across two distinct time windows."""
         pool = records
         if theme:
+            target_theme = theme.lower().strip()
             pool = [
                 r for r in pool
-                if (r.get("theme", "").lower() == theme.lower() or r.get("category", "").lower() == theme.lower())
+                if (
+                    (r.get("theme") and r["theme"].lower() == target_theme)
+                    or (r.get("category") and r["category"].lower() == target_theme)
+                    or classify_theme(r.get("free_text") or r.get("feedback") or "").lower() == target_theme
+                )
             ]
         if cohort:
-            pool = [r for r in pool if r.get("cohort", "").lower() == cohort.lower()]
+            target_cohort = cohort.lower().strip()
+            pool = [
+                r for r in pool
+                if (
+                    r.get("cohort", "").lower() == target_cohort
+                    or r.get("response_channel", "").lower() == target_cohort
+                    or r.get("channel", "").lower() == target_cohort
+                )
+            ]
 
         # Filter records for both periods
         current_records = filter_by_date(pool, current_start, current_end)

@@ -10,6 +10,7 @@ from langgraph.graph import END, START, StateGraph
 
 from app.agents.comparison_agent import ComparisonAgent
 from app.agents.data_agent import DataAgent
+from app.agents.planner import HybridPlanner
 from app.agents.rag_agent import RAGAgent
 from app.models.schemas import (
     AgentType,
@@ -37,7 +38,7 @@ class AgentGraphState(TypedDict, total=False):
 
 
 class OrchestratorAgent:
-    """Orchestrator and Planner constructing and managing the LangGraph execution flow."""
+    """Orchestrator managing the LangGraph execution flow with Hybrid LLM planning."""
 
     def __init__(
         self,
@@ -45,180 +46,18 @@ class OrchestratorAgent:
         rag_agent: RAGAgent | None = None,
         comparison_agent: ComparisonAgent | None = None,
         synthesizer: Synthesizer | None = None,
+        planner: HybridPlanner | None = None,
     ) -> None:
         self.data_agent = data_agent or DataAgent()
         self.rag_agent = rag_agent or RAGAgent()
         self.comparison_agent = comparison_agent or ComparisonAgent(data_agent=self.data_agent)
         self.synthesizer = synthesizer or Synthesizer()
+        self.planner = planner or HybridPlanner()
         self.graph = self._build_graph()
 
     def plan(self, question: str) -> list[TaskSpec]:
-        """Decompose a natural language business question into structured TaskSpecs.
-
-        Selectively routes only to agents required by the intent:
-        - "What are the top 3 complaints in May?" -> DataAgent only
-        - "How did CSAT change from April to May?" -> DataAgent + ComparisonAgent
-        - "Why are wait-time complaints increasing and what does the FAQ say?" -> DataAgent + RAGAgent
-        """
-        specs: list[TaskSpec] = []
-        lowered = question.lower()
-
-        # 1. Intent Detection
-        rag_triggers = [
-            "faq", "policy", "sla", "guarantee", "guarantees", "contract",
-            "refund", "refunds", "terms", "rules", "downgrade", "downgraded",
-            "cancellation", "what does the faq say", "official policy", "documentation"
-        ]
-        needs_rag = any(trigger in lowered for trigger in rag_triggers)
-
-        comparison_triggers = [
-            "compare", "comparison", "versus", "vs", "vs.", "difference",
-            "delta", "month-over-month", "mom", "from april to may",
-            "between april and may", "april to may", "compared to",
-            "change from", "changed from", "shift from"
-        ]
-        has_period_change = ("april" in lowered and "may" in lowered and ("change" in lowered or "shift" in lowered))
-        needs_comparison = any(trigger in lowered for trigger in comparison_triggers) or has_period_change
-
-        data_triggers = [
-            "csat", "nps", "rating", "score", "complaint", "complaints",
-            "feedback", "survey", "surveys", "theme", "themes", "driver",
-            "drivers", "top", "volume", "count", "sentiment", "wait-time",
-            "wait time", "pricing", "staff", "food", "cleanliness",
-            "app experience", "facilities", "enterprise", "self-serve", "self_serve"
-        ]
-        needs_data = any(trigger in lowered for trigger in data_triggers) or (not needs_rag and not needs_comparison)
-
-        # 2. Extract extraction helpers
-        # Dates
-        has_april = "april" in lowered or "2026-04" in lowered
-        has_may = "may" in lowered or "2026-05" in lowered
-
-        # Top N extraction (e.g., "top 3", "top 5")
-        top_n_match = re.search(r"top\s+(\d+)", lowered)
-        top_n = int(top_n_match.group(1)) if top_n_match else 5
-
-        # Cohort extraction
-        cohort = None
-        if "enterprise" in lowered:
-            cohort = "enterprise"
-        elif "self-serve" in lowered or "self_serve" in lowered or "self serve" in lowered:
-            cohort = "self_serve"
-
-        # Theme extraction
-        theme = None
-        if "wait" in lowered or "wait-time" in lowered:
-            theme = "Wait Time"
-        elif "food" in lowered:
-            theme = "Food Quality"
-        elif "clean" in lowered:
-            theme = "Cleanliness"
-        elif "pricing" in lowered or "price" in lowered or "billing" in lowered or "refund" in lowered:
-            theme = "Pricing"
-        elif "staff" in lowered:
-            theme = "Staff"
-        elif "member" in lowered or "membership" in lowered:
-            theme = "Membership"
-        elif "facility" in lowered or "facilities" in lowered:
-            theme = "Facilities"
-        elif "app" in lowered:
-            theme = "App Experience"
-
-        # 3. Build TaskSpecs
-
-        # Branch A: Comparison Task
-        if needs_comparison:
-            is_period = (has_april and has_may) or "month-over-month" in lowered or "mom" in lowered
-            if is_period:
-                specs.append(
-                    TaskSpec(
-                        task_id=f"task_{len(specs) + 1}",
-                        agent=AgentType.COMPARISON_AGENT.value,
-                        task_type=TaskType.PERIOD_COMPARISON.value,
-                        question=question,
-                        instruction="Perform deterministic month-over-month comparison between May 2026 and April 2026",
-                        start_date="2026-05-01",
-                        end_date="2026-05-31",
-                        comparison_start_date="2026-04-01",
-                        comparison_end_date="2026-04-30",
-                        parameters={
-                            "current_label": "May 2026",
-                            "previous_label": "April 2026",
-                            "theme": theme,
-                            "top_n": top_n,
-                        },
-                    )
-                )
-            else:
-                # Cohort comparison (e.g. enterprise vs self_serve)
-                cohort_a = "enterprise" if "enterprise" in lowered else "enterprise"
-                cohort_b = "self_serve" if ("self-serve" in lowered or "self_serve" in lowered) else "self_serve"
-                specs.append(
-                    TaskSpec(
-                        task_id=f"task_{len(specs) + 1}",
-                        agent=AgentType.COMPARISON_AGENT.value,
-                        task_type=TaskType.COMPARISON.value,
-                        question=question,
-                        instruction=f"Compare metrics between {cohort_a} and {cohort_b} cohorts",
-                        parameters={
-                            "cohort_a": cohort_a,
-                            "cohort_b": cohort_b,
-                            "metric": "csat",
-                            "metric_name": "csat",
-                            "top_n": top_n,
-                        },
-                    )
-                )
-
-        # Branch B: Data Analysis Task
-        if needs_data:
-            # Determine specific data task type
-            is_complaint_query = "complaint" in lowered or "negative" in lowered or "driver" in lowered
-            data_task_type = TaskType.TOP_THEMES.value if is_complaint_query else TaskType.DATA_ANALYSIS.value
-
-            data_start = "2026-05-01" if has_may and not has_april else ("2026-04-01" if has_april and not has_may else None)
-            data_end = "2026-05-31" if has_may and not has_april else ("2026-04-30" if has_april and not has_may else None)
-
-            specs.append(
-                TaskSpec(
-                    task_id=f"task_{len(specs) + 1}",
-                    agent=AgentType.DATA_AGENT.value,
-                    task_type=data_task_type,
-                    question=question,
-                    instruction="Compute exact deterministic survey metrics and theme drivers",
-                    start_date=data_start,
-                    end_date=data_end,
-                    parameters={
-                        "metric_name": "negative_volume" if is_complaint_query else "csat",
-                        "theme_metric": "negative_volume" if is_complaint_query else None,
-                        "cohort": cohort,
-                        "category": theme,
-                        "theme": theme,
-                        "top_n": top_n,
-                        "sentiment": "negative" if is_complaint_query else None,
-                    },
-                )
-            )
-
-        # Branch C: RAG Lookup Task
-        if needs_rag:
-            # Construct a clean targeted retrieval query
-            rag_query = question
-            if "faq" in lowered or "policy" in lowered:
-                # Remove conversational prefix if query is asking 'what does the faq say'
-                rag_query = re.sub(r"(?i)^(what does the faq say about|what does the faq say regarding|what does the faq say on)\s*", "", question)
-            specs.append(
-                TaskSpec(
-                    task_id=f"task_{len(specs) + 1}",
-                    agent=AgentType.RAG_AGENT.value,
-                    task_type=TaskType.RAG_LOOKUP.value,
-                    question=question,
-                    instruction="Retrieve grounded policy context from verified FAQ store",
-                    parameters={"query": rag_query.strip(), "top_k": 2},
-                )
-            )
-
-        return specs
+        """Decompose a natural language business question into structured TaskSpecs using HybridPlanner."""
+        return self.planner.plan(question)
 
     def _build_graph(self) -> Any:
         """Construct the compiled LangGraph StateGraph."""

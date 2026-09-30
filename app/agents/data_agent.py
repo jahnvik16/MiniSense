@@ -4,6 +4,7 @@ from typing import Any
 from app.models.schemas import DataAgentInput, DataAgentResult, TaskSpec
 from app.services.survey_service import SurveyService
 from app.tools.data_tools import (
+    DATA_AGENT_TOOLS,
     compute_average_rating,
     compute_csat,
     count_responses,
@@ -16,8 +17,11 @@ from app.tools.data_tools import (
 class DataAgent:
     """Sub-agent responsible for exact, deterministic survey calculations.
 
-    Explicitly delegates all arithmetic to standalone data tools to avoid
-    LLM mathematical hallucinations.
+    Architecture Distinction:
+    - Planner decides WHAT needs to be calculated (intent, metric, date range, filters).
+    - DataAgent decides WHICH analytics tool to invoke (routing to deterministic numerical functions).
+    - Tool performs pure arithmetic computation (no LLM math hallucinations).
+    - DataAgent returns structured, validated Pydantic output (DataAgentResult).
     """
 
     def __init__(self, service: SurveyService | None = None) -> None:
@@ -31,6 +35,7 @@ class DataAgent:
             "filter_by_date": filter_by_date,
             "filter_surveys": filter_surveys,
         }
+        self.tool_definitions = DATA_AGENT_TOOLS
 
     def run(self, task_or_input: TaskSpec | DataAgentInput) -> DataAgentResult:
         """Execute deterministic analytical tools on survey records."""
@@ -39,20 +44,26 @@ class DataAgent:
             task_id = task_or_input.task_id
             question = task_or_input.question
             params = task_or_input.parameters
-            start_date = task_or_input.start_date or params.get("start_date")
-            end_date = task_or_input.end_date or params.get("end_date")
-            cohort = params.get("cohort")
-            category = params.get("category") or params.get("theme")
-            top_n = int(params.get("top_n", 5))
+            filters = task_or_input.filters or {}
+            start_date = task_or_input.start_date or (task_or_input.date_range.get("start_date") if task_or_input.date_range else None) or params.get("start_date")
+            end_date = task_or_input.end_date or (task_or_input.date_range.get("end_date") if task_or_input.date_range else None) or params.get("end_date")
+            cohort = filters.get("cohort") or filters.get("response_channel") or params.get("cohort") or params.get("channel")
+            category = filters.get("theme") or filters.get("category") or params.get("category") or params.get("theme")
+            channel = filters.get("response_channel") or params.get("channel")
+            business_id = filters.get("business_id") or params.get("business_id")
+            top_n = int(task_or_input.requested_limit or params.get("top_n", 5))
         else:
             task_id = "legacy_data_task"
             question = f"Compute {task_or_input.metric_name} metrics"
             cohort = task_or_input.cohort
             category = task_or_input.category
+            channel = None
+            business_id = None
             start_date = None
             end_date = None
             top_n = 5
             params = {}
+            filters = {}
 
         tools_invoked: list[str] = []
         warnings: list[str] = []
@@ -60,9 +71,15 @@ class DataAgent:
         # 1. Fetch raw survey records
         records = self.service.get_all_surveys()
 
-        # 2. Apply cohort and category filtering deterministically
-        if cohort or category:
-            records = self.tools["filter_surveys"](records, cohort=cohort, category=category)
+        # 2. Apply cohort, category, channel, and business filtering deterministically
+        if cohort or category or channel or business_id:
+            records = self.tools["filter_surveys"](
+                records,
+                cohort=cohort,
+                category=category,
+                channel=channel,
+                business_id=business_id,
+            )
             tools_invoked.append("filter_surveys")
 
         # 3. Apply date filtering deterministically with graceful error handling

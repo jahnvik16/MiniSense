@@ -1,8 +1,145 @@
 """Deterministic numerical tools for survey analytics."""
 
+import re
 from datetime import datetime, timezone
 from typing import Any, Union
 from app.models.schemas import PeriodComparisonResult, PeriodMetrics, ThemeMetric
+
+# 8 Controlled Synthetic Themes
+THEMES = [
+    "Food Quality",
+    "Wait Time",
+    "Staff",
+    "Cleanliness",
+    "Pricing",
+    "Membership",
+    "Facilities",
+    "App Experience",
+]
+
+# Controlled Vocabulary Keywords for Deterministic Theme Classification
+THEME_KEYWORDS: dict[str, list[str]] = {
+    "Wait Time": [
+        "wait", "waited", "waiting", "wait time", "turnaround", "line", "lines",
+        "queue", "delay", "delays", "delayed", "slow", "lightning fast", "minutes",
+        "mins", "express pickup", "counter wait", "kitchen delay", "long wait"
+    ],
+    "Food Quality": [
+        "food", "taste", "tasted", "burger", "salad", "espresso", "toast", "avocado",
+        "grain bowl", "panini", "smoothie", "matcha", "seasoning", "stale", "undercooked",
+        "overcooked", "culinary", "flavor", "flavorful", "ingredients", "meal", "coffee",
+        "freshly", "bland", "lukewarm", "delicious", "salty", "portion", "recipe", "dish"
+    ],
+    "Staff": [
+        "staff", "cashier", "server", "hospitality", "attentive", "courteous", "unhelpful",
+        "dismissive", "friendly", "rushed", "team", "clerk", "worker", "welcoming",
+        "smiles", "service", "customer service", "manager", "barista"
+    ],
+    "Cleanliness": [
+        "clean", "cleanliness", "dirty", "messy", "tables", "trash", "sanitation",
+        "sanitized", "sticky", "hygiene", "tidy", "spotless", "restroom", "bathrooms",
+        "maintenance", "unbussed"
+    ],
+    "Pricing": [
+        "price", "prices", "pricing", "expensive", "bill", "cost", "value for money",
+        "cheap", "affordable", "hike", "fee", "fees", "rates", "charge", "charged",
+        "cost-to-benefit", "overpriced"
+    ],
+    "Membership": [
+        "member", "members", "membership", "tier", "rewards", "loyalty", "perks",
+        "points", "discount code", "vouchers", "vip", "portal", "credits"
+    ],
+    "Facilities": [
+        "facility", "facilities", "amenity", "amenities", "ac", "air conditioning",
+        "seating", "wi-fi", "wifi", "parking", "restroom", "room", "lighting",
+        "ventilated", "decor", "cramped", "lounge", "patio", "workspaces"
+    ],
+    "App Experience": [
+        "app", "mobile app", "crashed", "crash", "checkout", "glitch", "glitchy",
+        "digital wallet", "notifications", "order tracking", "interface", "ui",
+        "login", "loading spinner", "v2.0", "v1.8", "reorder"
+    ],
+}
+
+
+# Compiled keyword-to-theme mapping sorted by phrase length descending
+KEYWORD_TO_THEME: list[tuple[str, str]] = []
+for theme_name, kw_list in THEME_KEYWORDS.items():
+    for kw in kw_list:
+        KEYWORD_TO_THEME.append((kw.lower(), theme_name))
+KEYWORD_TO_THEME.sort(key=lambda x: -len(x[0]))
+
+
+def classify_sentiment(rating: int | float | None) -> str:
+    """Deterministically derive sentiment polarity from rating per specification.
+
+    1-2 -> negative
+    3   -> neutral
+    4-5 -> positive
+    """
+    if rating is None:
+        return "neutral"
+    try:
+        r = float(rating)
+    except (ValueError, TypeError):
+        return "neutral"
+
+    if r <= 2.0:
+        return "negative"
+    elif r == 3.0:
+        return "neutral"
+    else:
+        return "positive"
+
+
+def classify_theme(free_text: str | None) -> str:
+    """Deterministically classify customer free text comment into domain themes.
+
+    Applies exact rule-based keyword matching over the controlled synthetic vocabulary.
+    Covers the 8 core operational themes:
+    - Food Quality, Wait Time, Staff, Cleanliness, Pricing, Membership, Facilities, App Experience.
+    """
+    if not free_text or not str(free_text).strip():
+        return "General"
+
+    text_lower = f" {str(free_text).lower()} "
+    scores: dict[str, int] = {}
+
+    for kw, theme in KEYWORD_TO_THEME:
+        if kw in text_lower:
+            scores[theme] = scores.get(theme, 0) + 1
+
+    if not scores:
+        return "General"
+
+    return max(scores.items(), key=lambda x: x[1])[0]
+
+
+def classify_record_theme(record: dict[str, Any]) -> str:
+    """Get or compute cached theme for an in-memory survey record."""
+    if "_theme" in record:
+        return record["_theme"]
+    explicit = record.get("theme") or record.get("category")
+    if explicit:
+        record["_theme"] = explicit
+        return explicit
+    derived = classify_theme(record.get("free_text") or record.get("feedback"))
+    record["_theme"] = derived
+    return derived
+
+
+def extract_themes(free_text: str | None) -> list[str]:
+    """Extract all relevant themes mentioned in free text comment."""
+    if not free_text or not str(free_text).strip():
+        return ["General"]
+
+    text_lower = f" {str(free_text).lower()} "
+    matched = []
+    for theme, keywords in THEME_KEYWORDS.items():
+        if any(kw in text_lower for kw in keywords):
+            matched.append(theme)
+
+    return matched if matched else ["General"]
 
 
 def _extract_score(item: Any) -> float | None:
@@ -57,7 +194,7 @@ def filter_by_date(
 ) -> list[dict[str, Any]]:
     """Filter survey records deterministically by an inclusive date range.
 
-    Handles empty datasets, date-only strings ('2026-04-01'), ISO strings, and datetimes.
+    Handles Appendix A 'date' (YYYY-MM-DD), ISO 'timestamp', and datetimes.
     """
     if not records:
         return []
@@ -71,7 +208,7 @@ def filter_by_date(
 
     filtered: list[dict[str, Any]] = []
     for r in records:
-        record_dt = _parse_timestamp(r.get("timestamp"))
+        record_dt = _parse_timestamp(r.get("date") or r.get("timestamp"))
         if record_dt is None:
             continue
         if start_dt and record_dt < start_dt:
@@ -134,7 +271,10 @@ def count_responses(records: list[Any]) -> int:
 
 
 def compute_sentiment_breakdown(sentiments_or_records: list[Any]) -> dict[str, int]:
-    """Compute frequency counts for survey sentiments (positive, neutral, negative)."""
+    """Compute frequency counts for survey sentiments (positive, neutral, negative).
+
+    Derives sentiment from rating deterministically if not explicitly labeled.
+    """
     counts = {"positive": 0, "neutral": 0, "negative": 0}
     if not sentiments_or_records:
         return counts
@@ -144,11 +284,15 @@ def compute_sentiment_breakdown(sentiments_or_records: list[Any]) -> dict[str, i
         if isinstance(item, str):
             sentiment_val = item
         elif isinstance(item, dict):
-            sentiment_val = item.get("sentiment", "")
-        elif hasattr(item, "sentiment"):
+            sentiment_val = item.get("sentiment")
+            if not sentiment_val and "rating" in item:
+                sentiment_val = classify_sentiment(item["rating"])
+        elif hasattr(item, "sentiment") and item.sentiment:
             sentiment_val = item.sentiment
+        elif hasattr(item, "rating"):
+            sentiment_val = classify_sentiment(item.rating)
 
-        norm = sentiment_val.lower().strip()
+        norm = (sentiment_val or "").lower().strip()
         if norm in counts:
             counts[norm] += 1
         elif norm:
@@ -163,6 +307,7 @@ def get_top_themes(
 ) -> list[ThemeMetric]:
     """Extract aggregated theme metrics ranked deterministically.
 
+    Derives themes from free_text deterministically if not explicitly pre-labeled.
     Supported sorting metrics:
       - 'volume': highest count first (default)
       - 'csat_asc' / 'worst_csat': lowest CSAT first (complaint driver analysis)
@@ -172,10 +317,10 @@ def get_top_themes(
     if not records:
         return []
 
-    # Group by theme / category
+    # Group by theme (derived or pre-labeled, using in-memory cache)
     groups: dict[str, list[dict[str, Any]]] = {}
     for r in records:
-        theme = r.get("theme") or r.get("category") or "General"
+        theme = classify_record_theme(r)
         groups.setdefault(theme, []).append(r)
 
     metrics_list: list[ThemeMetric] = []
@@ -201,7 +346,7 @@ def get_top_themes(
         metrics_list.sort(key=lambda x: (x.csat, -x.count, x.theme))
     elif metric_lower in ("csat_desc", "best_csat", "highest_csat"):
         metrics_list.sort(key=lambda x: (-x.csat, -x.count, x.theme))
-    elif metric_lower in ("negative_volume", "negative"):
+    elif metric_lower in ("negative_volume", "negative", "complaint", "complaints"):
         metrics_list.sort(
             key=lambda x: (-x.sentiment_breakdown.get("negative", 0), x.csat, x.theme)
         )
@@ -223,12 +368,12 @@ def compare_period_metrics(
     label_b: str = "Period B",
 ) -> PeriodComparisonResult:
     """Compare performance metrics between two periods with delta analysis."""
-    # Optional preliminary filtering by theme and/or cohort
     pool = records
     if theme:
+        target = theme.lower().strip()
         pool = [
             r for r in pool
-            if (r.get("theme", "").lower() == theme.lower() or r.get("category", "").lower() == theme.lower())
+            if classify_record_theme(r).lower() == target
         ]
     if cohort:
         pool = [r for r in pool if r.get("cohort", "").lower() == cohort.lower()]
@@ -282,7 +427,7 @@ def compare_period_metrics(
     summary = (
         f"{label_b} vs {label_a}{scope_desc}: CSAT {qualifier} by {abs(csat_delta):.1f}% "
         f"({csat_a}% -> {csat_b}%), Average Rating shifted {avg_delta:+.2f} "
-        f"({avg_a:.2f} -> {avg_b:.2f}) across {count_b} vs {count_a} responses."
+        f"({avg_a:.2f} -> {avg_b:.2f}) across {count_b:,} vs {count_a:,} responses."
     )
 
     return PeriodComparisonResult(
@@ -325,16 +470,125 @@ def filter_surveys(
     records: list[dict[str, Any]],
     cohort: str | None = None,
     category: str | None = None,
+    theme: str | None = None,
+    channel: str | None = None,
+    business_id: str | None = None,
 ) -> list[dict[str, Any]]:
-    """Filter survey records deterministically by cohort or category."""
+    """Filter survey records deterministically by cohort, category/theme, channel, or business."""
     if not records:
         return []
     filtered = records
-    if cohort:
-        filtered = [r for r in filtered if r.get("cohort", "").lower() == cohort.lower()]
-    if category:
+
+    target_theme = (theme or category or "").lower().strip()
+    if target_theme:
         filtered = [
             r for r in filtered
-            if (r.get("category", "").lower() == category.lower() or r.get("theme", "").lower() == category.lower())
+            if classify_record_theme(r).lower() == target_theme
         ]
+
+    if cohort:
+        target_cohort = cohort.lower().strip()
+        filtered = [
+            r for r in filtered
+            if (
+                r.get("cohort", "").lower() == target_cohort
+                or r.get("response_channel", "").lower() == target_cohort
+                or r.get("channel", "").lower() == target_cohort
+            )
+        ]
+
+    if channel:
+        target_channel = channel.lower().strip()
+        filtered = [
+            r for r in filtered
+            if (
+                r.get("response_channel", "").lower() == target_channel
+                or r.get("channel", "").lower() == target_channel
+            )
+        ]
+
+    if business_id:
+        target_biz = business_id.lower().strip()
+        filtered = [
+            r for r in filtered
+            if r.get("business_id", "").lower() == target_biz
+        ]
+
     return filtered
+
+
+# Explicit Data Tools Specification Registry for Agentic Execution
+DATA_AGENT_TOOLS = [
+    {
+        "name": "compute_csat",
+        "description": "Calculates Customer Satisfaction (CSAT) percentage deterministically as the percentage of survey ratings >= 4 on a 1-5 scale.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "records_or_scores": {"type": "array", "description": "List of survey records or integer ratings"}
+            },
+            "required": ["records_or_scores"]
+        }
+    },
+    {
+        "name": "compute_average_rating",
+        "description": "Calculates the arithmetic mean rating (1.0 to 5.0) deterministically across survey records.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "records_or_scores": {"type": "array", "description": "List of survey records or integer ratings"}
+            },
+            "required": ["records_or_scores"]
+        }
+    },
+    {
+        "name": "count_responses",
+        "description": "Calculates total sample size and response count deterministically.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "records": {"type": "array", "description": "List of survey records"}
+            },
+            "required": ["records"]
+        }
+    },
+    {
+        "name": "get_top_themes",
+        "description": "Extracts aggregated theme metrics ranked deterministically by volume, lowest CSAT, or complaint frequency.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "records": {"type": "array", "description": "Survey records to group and rank"},
+                "top_n": {"type": "integer", "description": "Number of ranked themes to return"},
+                "metric": {"type": "string", "enum": ["volume", "negative_volume", "worst_csat", "best_csat"]}
+            },
+            "required": ["records"]
+        }
+    },
+    {
+        "name": "filter_by_date",
+        "description": "Filters survey records deterministically by an inclusive start and end date range.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "records": {"type": "array", "description": "Raw survey records"},
+                "start_date": {"type": "string", "description": "Inclusive start date (YYYY-MM-DD)"},
+                "end_date": {"type": "string", "description": "Inclusive end date (YYYY-MM-DD)"}
+            },
+            "required": ["records"]
+        }
+    },
+    {
+        "name": "filter_surveys",
+        "description": "Filters survey records deterministically by theme, channel, cohort, or location.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "records": {"type": "array", "description": "Survey records"},
+                "theme": {"type": "string", "description": "Operational theme filter"},
+                "channel": {"type": "string", "description": "Response channel filter"}
+            },
+            "required": ["records"]
+        }
+    }
+]
